@@ -90,6 +90,9 @@ export type MethodProfile = {
   fuel_truck_work: number;
   fuel_truck_idle: number;
   illustration: string;
+  /** false = jumlah unit fixed (mis. 1 tower crane) */
+  fleet_flexible: boolean;
+  max_place_units: number;
 };
 
 export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
@@ -112,6 +115,8 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     fuel_truck_work: 10,
     fuel_truck_idle: 2,
     illustration: "/illustrations/rmc-dolly-cycle.jpg",
+    fleet_flexible: true,
+    max_place_units: 20,
   },
   crane: {
     method: "crane",
@@ -122,7 +127,7 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
       "Bucket diisi di ground, diangkat crane ke ketinggian place. Cocok struktur bertingkat.",
     tasks: ["Fill bucket", "Lift / swing", "Place", "Return bucket"],
     place_capacity_m3: 1,
-    num_place: 2,
+    num_place: 1,
     cost_place_per_hour: 450_000,
     cost_truck_per_hour: 280_000,
     cost_place_op: 120_000,
@@ -132,6 +137,8 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     fuel_truck_work: 10,
     fuel_truck_idle: 2,
     illustration: "/illustrations/rmc-crane-cycle.jpg",
+    fleet_flexible: false,
+    max_place_units: 1,
   },
   pump: {
     method: "pump",
@@ -152,6 +159,8 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     fuel_truck_work: 10,
     fuel_truck_idle: 2,
     illustration: "/illustrations/rmc-pump-cycle.jpg",
+    fleet_flexible: true,
+    max_place_units: 4,
   },
 };
 

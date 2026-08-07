@@ -209,6 +209,20 @@ export function ConcretingPanel() {
     crane: METHOD_PROFILES.crane.num_place,
     pump: METHOD_PROFILES.pump.num_place,
   });
+  /** Sewa place equipment (Rp/jam) — tampil di UI sebagai ribu Rp/jam */
+  const [placeCost, setPlaceCost] = useState<Record<PlacementMethod, number>>({
+    dolly: METHOD_PROFILES.dolly.cost_place_per_hour,
+    crane: METHOD_PROFILES.crane.cost_place_per_hour,
+    pump: METHOD_PROFILES.pump.cost_place_per_hour,
+  });
+  const [placeOpCost, setPlaceOpCost] = useState<Record<PlacementMethod, number>>({
+    dolly: METHOD_PROFILES.dolly.cost_place_op,
+    crane: METHOD_PROFILES.crane.cost_place_op,
+    pump: METHOD_PROFILES.pump.cost_place_op,
+  });
+  /** Sewa truck mixer shared (Rp/jam) */
+  const [truckCost, setTruckCost] = useState(METHOD_PROFILES.dolly.cost_truck_per_hour);
+  const [truckOpCost, setTruckOpCost] = useState(METHOD_PROFILES.dolly.cost_truck_op);
   const initP = initPlaceState(DEFAULT_SITE.distance_m, DEFAULT_SITE.height_m, DEFAULT_SITE.cv, DEFAULT_SITE.default_dist_kind);
   const [placeMeans, setPlaceMeans] = useState(initP.means);
   const [placeDists, setPlaceDists] = useState(initP.dists);
@@ -261,6 +275,11 @@ export function ConcretingPanel() {
     place_travel_dist: placeDists[m].travel,
     place_place_dist: placeDists[m].place,
     place_return_dist: placeDists[m].return,
+    cost_loader_per_hour: placeCost[m],
+    cost_loader_operator_per_hour: placeOpCost[m],
+    cost_hauler_per_hour: truckCost,
+    cost_hauler_operator_per_hour: truckOpCost,
+    cost_all_in: true,
   });
   const runCompare = () => {
     setRunning(true);
@@ -273,8 +292,8 @@ export function ConcretingPanel() {
           const vol = Math.max(r.total_volume, 1e-9);
           const p = METHOD_PROFILES[method];
           const totalCost =
-            hours * numPlace[method] * (p.cost_place_per_hour + p.cost_place_op) +
-            hours * site.num_trucks * (p.cost_truck_per_hour + p.cost_truck_op);
+            hours * numPlace[method] * (placeCost[method] + placeOpCost[method]) +
+            hours * site.num_trucks * (truckCost + truckOpCost);
           const totalEmission =
             hours * numPlace[method] *
               (p.fuel_place_work * 0.5 + p.fuel_place_idle * 0.5) * 2.68 +
@@ -318,6 +337,18 @@ export function ConcretingPanel() {
       crane: METHOD_PROFILES.crane.num_place,
       pump: METHOD_PROFILES.pump.num_place,
     });
+    setPlaceCost({
+      dolly: METHOD_PROFILES.dolly.cost_place_per_hour,
+      crane: METHOD_PROFILES.crane.cost_place_per_hour,
+      pump: METHOD_PROFILES.pump.cost_place_per_hour,
+    });
+    setPlaceOpCost({
+      dolly: METHOD_PROFILES.dolly.cost_place_op,
+      crane: METHOD_PROFILES.crane.cost_place_op,
+      pump: METHOD_PROFILES.pump.cost_place_op,
+    });
+    setTruckCost(METHOD_PROFILES.dolly.cost_truck_per_hour);
+    setTruckOpCost(METHOD_PROFILES.dolly.cost_truck_op);
     const p = initPlaceState(
       DEFAULT_SITE.distance_m,
       DEFAULT_SITE.height_m,
@@ -647,16 +678,109 @@ export function ConcretingPanel() {
                       {site.height_m} m (bisa diubah). Setiap task punya distribusi sama pola Cycle A
                       truck mixer.
                     </p>
-                    <Field
-                      label={`Jumlah ${prof.placeLabel.toLowerCase()}`}
-                      value={numPlace[m]}
-                      min={1}
-                      max={20}
-                      step={1}
-                      onChange={(v) =>
-                        setNumPlace((p) => ({ ...p, [m]: Math.floor(v) }))
-                      }
-                    />
+                    <div className="space-y-3 rounded-[var(--radius-lg)] border border-border bg-muted/20 p-3 sm:p-4">
+                      <div>
+                        <p className="text-sm font-medium">Resource & biaya (Cycle B + truck mixer)</p>
+                        <p className="text-xs text-muted-foreground">
+                          Biaya sewa dalam ribu Rp/jam (×1000). Operator ditambahkan (all-in).
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {prof.fleet_flexible ? (
+                          <Field
+                            label={`Jumlah ${prof.placeLabel.toLowerCase()}`}
+                            value={numPlace[m]}
+                            min={1}
+                            max={prof.max_place_units}
+                            step={1}
+                            onChange={(v) =>
+                              setNumPlace((p) => ({
+                                ...p,
+                                [m]: Math.min(
+                                  prof.max_place_units,
+                                  Math.max(1, Math.floor(v)),
+                                ),
+                              }))
+                            }
+                          />
+                        ) : (
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">
+                              Jumlah {prof.placeLabel.toLowerCase()}
+                            </Label>
+                            <div className="flex h-9 items-center rounded-md border border-border bg-background px-3 text-sm tabular-nums">
+                              {numPlace[m]}{" "}
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                (fixed — tidak ditambah)
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <Field
+                          label={`Sewa ${prof.placeLabel.toLowerCase()}`}
+                          unit="ribu Rp/jam"
+                          value={placeCost[m] / 1000}
+                          min={0}
+                          max={5000}
+                          step={5}
+                          onChange={(v) =>
+                            setPlaceCost((c) => ({ ...c, [m]: v * 1000 }))
+                          }
+                        />
+                        <Field
+                          label="Operator place"
+                          unit="ribu Rp/jam"
+                          value={placeOpCost[m] / 1000}
+                          min={0}
+                          max={2000}
+                          step={5}
+                          onChange={(v) =>
+                            setPlaceOpCost((c) => ({ ...c, [m]: v * 1000 }))
+                          }
+                        />
+                        <Field
+                          label="Sewa truck mixer"
+                          unit="ribu Rp/jam"
+                          value={truckCost / 1000}
+                          min={0}
+                          max={2000}
+                          step={5}
+                          onChange={(v) => setTruckCost(v * 1000)}
+                        />
+                        <Field
+                          label="Operator truck mixer"
+                          unit="ribu Rp/jam"
+                          value={truckOpCost / 1000}
+                          min={0}
+                          max={1000}
+                          step={5}
+                          onChange={(v) => setTruckOpCost(v * 1000)}
+                        />
+                        <Field
+                          label="Jumlah truck mixer"
+                          value={site.num_trucks}
+                          min={1}
+                          max={20}
+                          step={1}
+                          onChange={(v) =>
+                            patchSite({ num_trucks: Math.max(1, Math.floor(v)) })
+                          }
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Estimasi biaya/jam armada place:{" "}
+                        <strong className="text-foreground">
+                          {(
+                            (numPlace[m] * (placeCost[m] + placeOpCost[m]) +
+                              site.num_trucks * (truckCost + truckOpCost)) /
+                            1000
+                          ).toFixed(0)}{" "}
+                          ribu Rp/jam
+                        </strong>
+                        {" · "}
+                        Kapasitas place {prof.place_capacity_m3} m³/cycle
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       <div>
                         <p className="text-sm font-medium">Cycle B · placing tasks + distribution</p>
