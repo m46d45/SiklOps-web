@@ -453,6 +453,18 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
 
   integrateQ(maxHorizon);
   snapQ(maxHorizon);
+
+  // censored waits: request still in queue at end of shift
+  for (const req of queue) {
+    const wait = Math.max(0, maxHorizon - req.arrive);
+    waitSamples.push(wait);
+    const st = statById.get(req.frontId);
+    if (st) {
+      st.wait_total += wait;
+      st.waits.push(wait);
+    }
+  }
+
   const horizon = maxHorizon;
   const craneBusyMin = craneBusyInt.reduce(
     (s, rows) =>
