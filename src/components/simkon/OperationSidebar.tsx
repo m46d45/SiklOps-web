@@ -1,4 +1,10 @@
-import { ArrowUpFromLine, BookOpen, Construction, Layers, Truck } from "lucide-react";
+import {
+  BookOpen,
+  BrickWall,
+  Cylinder,
+  Shovel,
+  type LucideIcon,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
   OPERATIONS,
@@ -7,17 +13,58 @@ import {
 } from "@/lib/simkon/operations";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<OperationId, typeof Truck> = {
-  earthmoving: Truck,
-  bricklaying: Layers,
-  concreting: Construction,
-  tower_crane: ArrowUpFromLine,
+/** Simple tower-crane silhouette (lucide has no dedicated crane) */
+function TowerCraneIcon({
+  className,
+  strokeWidth = 1.75,
+}: {
+  className?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      {/* mast */}
+      <path d="M8 21V5" />
+      {/* base */}
+      <path d="M5 21h8" />
+      {/* jib */}
+      <path d="M8 6h12" />
+      {/* counter-jib */}
+      <path d="M8 6H4" />
+      {/* counterweight */}
+      <path d="M3 6v2h2V6" />
+      {/* trolley + hook */}
+      <path d="M16 6v3" />
+      <path d="M14.5 9h3" />
+      <path d="M16 9v3" />
+      <circle cx="16" cy="13" r="0.8" fill="currentColor" stroke="none" />
+      {/* cabin */}
+      <path d="M7 8h3v2H7z" />
+    </svg>
+  );
+}
+
+type OpIcon = LucideIcon | typeof TowerCraneIcon;
+
+const ICONS: Record<OperationId, OpIcon> = {
+  earthmoving: Shovel, // galian
+  bricklaying: BrickWall, // pasangan bata
+  concreting: Cylinder, // drum / ready-mix
+  tower_crane: TowerCraneIcon,
 };
 
 type Props = {
   selected: OperationId;
   onSelect: (id: OperationId) => void;
-  /** Optional: close mobile drawer when navigating */
   onNavigate?: () => void;
   className?: string;
 };
@@ -84,7 +131,7 @@ function OperationItem({
   active: boolean;
   onSelect: (id: OperationId) => void;
 }) {
-  const Icon = ICONS[op.id] ?? Truck;
+  const Icon = ICONS[op.id] ?? Shovel;
   const disabled = !op.available;
 
   return (
