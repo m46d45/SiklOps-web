@@ -120,15 +120,15 @@ export const OPERATIONS: OperationInfo[] = [
     },
     manual: {
       summary:
-        "DES armada galian-angkut. Bottleneck biasanya excavator (load) atau dump truck (haul).",
+        "Level 1 — 1 siklus multi-server. Load–Haul–Dump–Return. Pelajari match factor, util, antrian loading, biaya & emisi satuan, sweet spot fleet.",
       howTo: [
-        "Atur jumlah excavator & dump truck plus kapasitas volume.",
-        "Isi mean cycle Load–Haul–Dump–Return (menit) dan distribusi.",
-        "Set target siklus dan/atau volume (m³), jalankan simulasi.",
-        "Baca Ringkasan (util, antrian, biaya, emisi) lalu tab Perbandingan untuk fleet.",
+        "Atur n excavator & n dump truck + kapasitas bucket/bak.",
+        "Isi mean + distribusi Load–Haul–Dump–Return (menit).",
+        "Set target siklus dan/atau volume (m³); jalankan.",
+        "Baca Ringkasan lalu Perbandingan (thr sim vs teori, sweet spot).",
       ],
       notes:
-        "Volume per trip = kapasitas bak truck. Match factor ≈ kap. hauling / kap. loading.",
+        "Volume/trip = kapasitas bak. Match factor ≈ kap. hauling / kap. loading. Default sewa & solar ≈ pasar ID excavator 0,5 m³ & DT 4 m³.",
     },
     illustration: "/illustrations/earthmoving-cycle.jpg",
   },
@@ -176,15 +176,15 @@ export const OPERATIONS: OperationInfo[] = [
     },
     manual: {
       summary:
-        "Batch model: 1 trip helper = 1 batch bata (default 20). Scaffold 3 slot (max 60). Temp 10 slot (max 200). Threshold default 60 → fetch pile jauh. Mortar: 3 ember, 1 ember = 20 bata; tim mortar always-ready.",
+        "Level 2 — 4 tugas (fetch, lift, mortar, pasang), masing-masing 1 mean+dist. Helper shared; buffer batch di temp & scaffold; mortar ember terbatas.",
       howTo: [
-        "Set batch_bricks, scaffold_slots, temp_slots, temp_refill_threshold.",
-        "Set mortar_buckets_max dan mortar_covers_bricks.",
-        "Helper pool mengerjakan fetch / lift bata / supply mortar.",
-        "Tukang butuh bata + mortar di scaffold sebelum pasang.",
+        "Set helper, tukang, batch, slot scaffold/temp, threshold fetch, ember mortar.",
+        "Atur mean+dist: A fetch · B lift · B′ mortar · C pasang.",
+        "Set upah tukang/helper (ribu Rp/jam), target m² / siklus, jalankan.",
+        "Lihat bottleneck: helper supply vs tukang vs scaffold stock.",
       ],
       notes:
-        "Unload bata ke scaffold hanya jika ada slot kosong penuh 1 batch. Volume m² = bata / bricks_per_m2.",
+        "1 slot scaffold = 1 batch. Tukang butuh bata + mortar. Volume m² = bata / bricks_per_m2. Default upah mid-ID.",
     },
     illustration: "/illustrations/bricklaying-cycle.jpg",
     illustrationCaption:
@@ -234,15 +234,15 @@ export const OPERATIONS: OperationInfo[] = [
     },
     manual: {
       summary:
-        "One Concreting operation with a shared site scenario (distance & height from truck discharge). Three placing methods: concrete buggy, tower crane + bucket, pump — plus comparison.",
+        "Level 3 — dual-cycle: A truck mixer plant↔site + B placing (buggy / crane bucket / pump) lewat site buffer. Skenario jarak & tinggi shared.",
       howTo: [
-        "Set site scenario: horizontal distance and vertical height from RMC truck to pour point.",
-        "Open method tabs (Buggy / Crane / Pump); place-cycle times are derived from distance/height.",
-        "Cycle A truck plant↔site is shared; Cycle B placing differs by method.",
-        "Comparison tab: throughput, util, unit cost, unit emissions under the same scenario.",
+        "Set site scenario (jarak horizontal + tinggi) dari discharge truk ke pour.",
+        "Isi cycle A truck (batch/haul/discharge/return) — shared.",
+        "Pilih tab metode placing; atur unit place, kapasitas/sewa; jalankan.",
+        "Bandingkan thr, util, biaya satuan, emisi antar metode pada skenario sama.",
       ],
       notes:
-        "Dual-cycle + site buffer. Production counted at place completion. Who waits whom: trucks wait if buffer full; place waits if buffer empty.",
+        "Truck antri jika buffer penuh; place antri jika buffer kosong. Produksi = place selesai. Crane: 1 TC fixed, bucket ≤ kapasitas angkat.",
     },
   },
   {
@@ -289,15 +289,15 @@ export const OPERATIONS: OperationInfo[] = [
     },
     manual: {
       summary:
-        "Single-server + Poisson: request Exp per front, service 1 dist per front, prioritas non-preemptive. Stop = waktu operasi.",
+        "Level 4 — banyak front minta lift (Poisson/Exp), 1 crane service (1 dist per front), prioritas non-preemptive. Stop = waktu operasi (default 8 jam).",
       howTo: [
-        "Aktifkan front, set prioritas dan mean inter-arrival (default Exp).",
-        "Set mean service per front (lokasi berbeda).",
-        "Jalankan shift 8 jam — lihat util crane, wait per front.",
-        "Front prio rendah menunggu lebih lama saat crane jenuh.",
+        "Aktifkan front A/B/C…; set prioritas 1→9 (default 1,2,3).",
+        "Set mean inter-arrival (Exp) + mean service per front; tarif crew untuk waste.",
+        "Set waktu operasi maks (jam) + sewa crane; jalankan.",
+        "Baca wait request→service, starvation %, wait vs prio-1, waste crew.",
       ],
       notes:
-        "Tidak ada hauler/excavator. KPI: util crane, lift, antrian request, wait per front.",
+        "KPI khusus TC: util crane, antrian request, starvation, fairness prioritas, biaya crane+waste, emisi crane. Bukan model hauler.",
     },
     illustration: "/illustrations/tower-crane-multi-front.jpg",
     illustrationCaption:

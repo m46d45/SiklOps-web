@@ -25,14 +25,11 @@ function ManualPage() {
               <BookOpen className="h-5 w-5" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-base font-semibold tracking-tight sm:text-lg">
-                  Manual SiklOps
-                </h1>
-                
-              </div>
+              <h1 className="text-base font-semibold tracking-tight sm:text-lg">
+                Manual SiklOps
+              </h1>
               <p className="truncate text-xs text-muted-foreground">
-                Panduan umum · parameter · hasil · per operasi
+                Panduan lengkap · DES operasi konstruksi · sederhana → kompleks
               </p>
             </div>
           </div>
@@ -46,64 +43,169 @@ function ManualPage() {
       </header>
 
       <main className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6">
-        {/* —— Intro —— */}
+        {/* TOC */}
         <Card className="rounded-[var(--radius-xl)]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Daftar isi</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+              <li>
+                <a href="#apa" className="text-foreground hover:underline">
+                  Apa itu SiklOps?
+                </a>
+              </li>
+              <li>
+                <a href="#jalur" className="text-foreground hover:underline">
+                  Jalur pembelajaran
+                </a>
+              </li>
+              <li>
+                <a href="#alur" className="text-foreground hover:underline">
+                  Alur kerja
+                </a>
+              </li>
+              <li>
+                <a href="#parameter" className="text-foreground hover:underline">
+                  Parameter umum
+                </a>
+              </li>
+              <li>
+                <a href="#hasil" className="text-foreground hover:underline">
+                  Cara membaca hasil
+                </a>
+              </li>
+              <li>
+                <a href="#rumus" className="text-foreground hover:underline">
+                  Rumus singkat
+                </a>
+              </li>
+              <li>
+                <a href="#earthmoving" className="text-foreground hover:underline">
+                  Earthmoving
+                </a>
+              </li>
+              <li>
+                <a href="#bricklaying" className="text-foreground hover:underline">
+                  Bricklaying
+                </a>
+              </li>
+              <li>
+                <a href="#concreting" className="text-foreground hover:underline">
+                  Concreting
+                </a>
+              </li>
+              <li>
+                <a href="#tower" className="text-foreground hover:underline">
+                  Tower Crane
+                </a>
+              </li>
+              <li>
+                <a href="#tips" className="text-foreground hover:underline">
+                  Tips & FAQ
+                </a>
+              </li>
+            </ol>
+          </CardContent>
+        </Card>
+
+        {/* —— Intro —— */}
+        <Card id="apa" className="scroll-mt-20 rounded-[var(--radius-xl)]">
           <CardHeader>
-            <CardTitle className="text-base">Apa itu SiklOps?</CardTitle>
+            <CardTitle className="text-base">1. Apa itu SiklOps?</CardTitle>
             <CardDescription className="leading-relaxed">
               <strong className="text-foreground">SiklOps</strong> (Siklus Operasi) adalah
               aplikasi pembelajaran{" "}
               <strong className="text-foreground">Discrete Event Simulation (DES)</strong>{" "}
-              untuk operasi konstruksi yang berulang: galian-angkut, pasangan bata,
-              ready-mixed concrete (dolly / tower crane bucket / pump), dan seterusnya.
+              untuk operasi konstruksi yang berulang.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
-              Fokusnya:{" "}
+              Fokus:{" "}
               <strong className="text-foreground">
-                throughput, utilisasi resource, antrian, match factor, biaya, emisi CO₂e,
-                dan komposisi armada
+                throughput, utilisasi resource, antrian, prioritas, buffer, biaya, emisi
               </strong>
-              — bukan penjadwalan proyek (WBS / CPM / Gantt proyek).
+              — bukan penjadwalan proyek (WBS / CPM / Gantt).
             </p>
             <p>
-              Semua operasi memakai{" "}
-              <strong className="text-foreground">template yang sama</strong>: sidebar
-              operasi → deskripsi + parameter → jalankan → tab hasil standar.
+              Empat operasi diurutkan dari{" "}
+              <strong className="text-foreground">sederhana → kompleks</strong> agar konsep
+              DES diperkenalkan bertahap.
             </p>
           </CardContent>
         </Card>
 
+        {/* —— Learning path —— */}
+        <section id="jalur" className="scroll-mt-20 space-y-3">
+          <h2 className="text-sm font-semibold tracking-tight">2. Jalur pembelajaran</h2>
+          <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border">
+            <table className="w-full min-w-[320px] text-left text-sm">
+              <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">#</th>
+                  <th className="px-3 py-2 font-medium">Operasi</th>
+                  <th className="px-3 py-2 font-medium">Model</th>
+                  <th className="px-3 py-2 font-medium">Konsep utama</th>
+                </tr>
+              </thead>
+              <tbody className="text-muted-foreground">
+                <tr className="border-b border-border/80">
+                  <td className="px-3 py-2">1</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Earthmoving</td>
+                  <td className="px-3 py-2">1 siklus · multi-server</td>
+                  <td className="px-3 py-2">Load–Haul–Dump–Return, match factor, fleet</td>
+                </tr>
+                <tr className="border-b border-border/80">
+                  <td className="px-3 py-2">2</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Bricklaying</td>
+                  <td className="px-3 py-2">3 siklus · buffer batch</td>
+                  <td className="px-3 py-2">Helper multi-tugas, slot scaffold, mortar</td>
+                </tr>
+                <tr className="border-b border-border/80">
+                  <td className="px-3 py-2">3</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Concreting</td>
+                  <td className="px-3 py-2">2 siklus berinteraksi</td>
+                  <td className="px-3 py-2">RMC ↔ placing, site buffer, 3 metode</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">4</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Tower Crane</td>
+                  <td className="px-3 py-2">Banyak request · 1 server</td>
+                  <td className="px-3 py-2">Poisson, prioritas, starvation, waste crew</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Sama seperti urutan di sidebar: mulailah dari atas jika baru mengenal DES.
+          </p>
+        </section>
+
+        <Separator />
+
         {/* —— Alur —— */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">1. Alur kerja</h2>
+        <section id="alur" className="scroll-mt-20 space-y-3">
+          <h2 className="text-sm font-semibold tracking-tight">3. Alur kerja</h2>
           <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>
-              <strong className="text-foreground">Pilih operasi</strong> di sidebar kiri
-              (Earthmoving, Bricklaying, RMC Dolly / Crane / Pump).
+              <strong className="text-foreground">Pilih operasi</strong> di sidebar (Earthmoving
+              → Bricklaying → Concreting → Tower Crane).
             </li>
             <li>
-              Baca <strong className="text-foreground">deskripsi, tugas, resource, satuan</strong>{" "}
-              di kartu atas halaman.
+              Baca deskripsi, ilustrasi, resource, dan parameter di halaman utama.
             </li>
             <li>
-              Atur <strong className="text-foreground">parameter simulasi</strong> (resource,
-              cycle time, target, seed, biaya, solar).
+              Atur parameter (resource, mean + distribusi, biaya, target / waktu operasi).
             </li>
             <li>
               Tekan <strong className="text-foreground">Jalankan simulasi</strong>.
             </li>
             <li>
-              Baca hasil di tab{" "}
-              <strong className="text-foreground">
-                Ringkasan · Perbandingan · Teori antrian
-              </strong>
-              .
+              Baca tab hasil (Ringkasan, Perbandingan, Antrian / Teori — tergantung operasi).
             </li>
             <li>
-              Opsional: <strong className="text-foreground">Skenario</strong> (simpan/muat)
-              atau <strong className="text-foreground">CSV</strong> (export laporan).
+              Opsional: multi-seed, simpan skenario, export CSV (jika tersedia di operasi itu).
             </li>
           </ol>
         </section>
@@ -111,145 +213,113 @@ function ManualPage() {
         <Separator />
 
         {/* —— Parameter —— */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">2. Parameter simulasi</h2>
+        <section id="parameter" className="scroll-mt-20 space-y-3">
+          <h2 className="text-sm font-semibold tracking-tight">4. Parameter umum</h2>
 
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <Card className="rounded-[var(--radius-lg)]">
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm">Resource</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 p-4 pt-0 text-xs leading-relaxed sm:text-sm">
-                <ul className="list-disc space-y-1.5 pl-5">
-                  <li>
-                    Dua jenis resource: <strong className="text-foreground">loader</strong>{" "}
-                    (server, mis. excavator/tukang/mixer) dan{" "}
-                    <strong className="text-foreground">hauler</strong> (yang berputar di
-                    cycle, mis. dump truck/helper/truck mixer).
-                  </li>
-                  <li>Jumlah unit + kapasitas volume (atau m²) per resource.</li>
-                  <li>
-                    Volume per trip = kapasitas hauler (payload).
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Biaya sewa</strong> diisi dalam{" "}
-                    <strong className="text-foreground">ribuan Rp/jam</strong> (×1000). Contoh:
-                    160 = Rp 160.000/jam.
-                  </li>
-                  <li>
-                    Toggle <strong className="text-foreground">all-in</strong>: sewa + operator.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Solar (L/jam)</strong> kerja &
-                    idle → emisi dihitung otomatis × {DIESEL_KG_CO2_PER_L} kg CO₂/L.
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
+          <Card className="rounded-[var(--radius-lg)]">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Distribusi durasi</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 p-4 pt-0 text-sm text-muted-foreground">
+              <p>
+                Hampir semua tugas punya <strong className="text-foreground">mean (menit)</strong>{" "}
+                + <strong className="text-foreground">distribusi</strong>:
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs sm:text-sm">
+                <li>
+                  <strong className="text-foreground">Konstan</strong> — tidak acak
+                </li>
+                <li>
+                  <strong className="text-foreground">Normal / Log-normal / Gamma / Beta</strong> —
+                  + CV (std/mean)
+                </li>
+                <li>
+                  <strong className="text-foreground">Eksponensial (Poisson)</strong> — inter-arrival
+                  request (Tower Crane); CV tetap 1
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
 
-            <Card className="rounded-[var(--radius-lg)]">
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm">Tugas (cycle time)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 p-4 pt-0 text-xs leading-relaxed sm:text-sm">
-                <p>
-                  Empat fase cycle (label menyesuaikan operasi). Setiap fase punya{" "}
-                  <strong className="text-foreground">mean (menit)</strong> dan{" "}
-                  <strong className="text-foreground">distribusi</strong> (konstan, normal,
-                  log-normal, gamma, beta) + CV.
-                </p>
-                <p>
-                  Earthmoving: Load → Haul → Dump → Return. Bricklaying memakai cycle 2-resource.
-                  RMC memakai <strong className="text-foreground">dual-cycle</strong>: truck
-                  mixer plant↔site + pengecoran (dolly / crane / pump) lewat buffer site.
-                </p>
-              </CardContent>
-            </Card>
+          <Card className="rounded-[var(--radius-lg)]">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Biaya & emisi</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-1.5 pl-5 text-xs sm:text-sm">
+                <li>
+                  Input sewa sering dalam <strong className="text-foreground">ribuan Rp/jam</strong>{" "}
+                  (×1000). Contoh: 160 = Rp 160.000/jam.
+                </li>
+                <li>
+                  <strong className="text-foreground">All-in</strong> = sewa + operator (jika
+                  diaktifkan).
+                </li>
+                <li>
+                  Emisi diesel ≈ L/jam × {DIESEL_KG_CO2_PER_L} kg CO₂/L (kerja & idle terpisah).
+                </li>
+                <li>
+                  Bricklaying default: upah tukang & helper (bukan mesin berat).
+                </li>
+                <li>
+                  Tower Crane: sewa crane + <strong className="text-foreground">waste crew</strong>{" "}
+                  per front (tarif crew × jam tunggu).
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
 
-            <Card className="rounded-[var(--radius-lg)]">
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm">Setup simulasi</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 p-4 pt-0 text-xs leading-relaxed sm:text-sm">
-                <ul className="list-disc space-y-1.5 pl-5">
-                  <li>
-                    <strong className="text-foreground">Target siklus</strong> — berhenti setelah
-                    N trip selesai.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Target pekerjaan</strong> — berhenti saat
-                    volume (m³/m²) tercapai.
-                  </li>
-                  <li>
-                    Berhenti pada yang <strong className="text-foreground">lebih dulu</strong>{" "}
-                    tercapai (plus batas waktu pengaman).
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Seed</strong> — bilangan acak tetap agar
-                    hasil reproducible (default 12345).
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="rounded-[var(--radius-lg)]">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Kapan simulasi berhenti?</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-1.5 pl-5 text-xs sm:text-sm">
+                <li>
+                  <strong className="text-foreground">Earthmoving / Bricklaying / Concreting</strong>
+                  — target siklus dan/atau target volume (yang lebih dulu), plus batas waktu
+                  pengaman.
+                </li>
+                <li>
+                  <strong className="text-foreground">Tower Crane</strong> —{" "}
+                  <strong className="text-foreground">waktu operasi maksimum</strong> (default 8
+                  jam). Tidak memakai target volume.
+                </li>
+                <li>
+                  <strong className="text-foreground">Seed</strong> — bilangan acak tetap (default
+                  12345) agar hasil reproducible.
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
         </section>
 
         <Separator />
 
         {/* —— Hasil —— */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">3. Cara membaca hasil</h2>
-          <p className="text-sm text-muted-foreground">
-            Setelah run, hasil dikelompokkan dalam tiga tab standar (sama untuk semua
-            operasi).
-          </p>
+        <section id="hasil" className="scroll-mt-20 space-y-3">
+          <h2 className="text-sm font-semibold tracking-tight">5. Cara membaca hasil</h2>
 
           <Card className="rounded-[var(--radius-lg)]">
             <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-sm">Tab Ringkasan</CardTitle>
-              <CardDescription>Tempat utama setelah simulasi.</CardDescription>
+              <CardTitle className="text-sm">Earthmoving · Bricklaying · Concreting</CardTitle>
+              <CardDescription>Tab standar: Ringkasan · Perbandingan · Teori antrian</CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
                 <li>
-                  <strong className="text-foreground">KPI</strong> — trip, volume, throughput,
-                  util, antrian, match factor, gap sim vs teori, waktu ke target.
+                  <strong className="text-foreground">Ringkasan</strong> — KPI (trip, volume,
+                  thr, util), bottleneck, biaya, emisi, learning curve, util per siklus,
+                  antrian, multi-seed, saran desain.
                 </li>
                 <li>
-                  <strong className="text-foreground">Bottleneck</strong> — resource yang paling
-                  membatasi produksi.
+                  <strong className="text-foreground">Perbandingan</strong> — grid jumlah
+                  resource (what-if fleet): thr sim vs teori, util, biaya satuan, emisi satuan,
+                  sweet spot.
                 </li>
                 <li>
-                  <strong className="text-foreground">Biaya</strong> — per resource, waiting
-                  (waste), total fleet, satuan (Rp per unit volume), waste per unit.
-                </li>
-                <li>
-                  <strong className="text-foreground">Emisi CO₂e</strong> — per resource, waiting
-                  karbon, total, satuan (kg per unit), waste per unit.
-                </li>
-                <li>
-                  <strong className="text-foreground">Learning curve</strong> — produktivitas
-                  per siklus (tebal) + moving average (putus-putus), satuan unit/jam.
-                </li>
-                <li>
-                  <strong className="text-foreground">Steady state</strong> — zona CV
-                  produktivitas rendah; prod. SS jika tercapai.
-                </li>
-                <li>
-                  <strong className="text-foreground">Utilisasi per siklus</strong> dan komposisi
-                  cycle (load/haul/… + %).
-                </li>
-                <li>
-                  <strong className="text-foreground">Antrian</strong> — grafik panjang antri vs
-                  waktu + metrik tunggu.
-                </li>
-                <li>
-                  <strong className="text-foreground">Multi-run</strong> — 5/10/20 seed: mean ±
-                  std throughput, biaya satuan, emisi satuan.
-                </li>
-                <li>
-                  <strong className="text-foreground">Saran desain</strong> — kap. teori, match
-                  factor, jumlah hauler ideal, daftar what-if.
+                  <strong className="text-foreground">Teori antrian</strong> — Little & Kingman vs
+                  DES (modul lanjutan).
                 </li>
               </ul>
             </CardContent>
@@ -257,57 +327,27 @@ function ManualPage() {
 
           <Card className="rounded-[var(--radius-lg)]">
             <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-sm">Tab Perbandingan</CardTitle>
+              <CardTitle className="text-sm">Tower Crane (panel khusus)</CardTitle>
               <CardDescription>
-                What-if komposisi fleet (loader 1–3 × hauler 1–40).
+                Bukan metafor excavator/hauler — hasil disesuaikan multi-front.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
                 <li>
-                  X = jumlah hauler; tiap warna = jumlah loader.
+                  <strong className="text-foreground">Ringkasan</strong> — lift, thr, util crane,
+                  wait antrian, starvation, wait vs prio-1, biaya crane + waste crew, emisi.
                 </li>
                 <li>
-                  Throughput <strong className="text-foreground">sim (tebal)</strong> vs{" "}
-                  <strong className="text-foreground">teori (putus-putus)</strong>.
-                </li>
-                <li>Utilisasi loader & hauler, waktu tunggu, panjang antrian.</li>
-                <li>Biaya satuan, waste waiting, emisi satuan, waste karbon.</li>
-                <li>
-                  <strong className="text-foreground">Sweet spot</strong> — max thr · min biaya
-                  · min emisi (bisa di jumlah hauler berbeda).
+                  <strong className="text-foreground">Per front</strong> — requests vs lifts, wait
+                  avg/p50/p90/max, waste per front.
                 </li>
                 <li>
-                  <strong className="text-foreground">Sensitivitas CV</strong> — ulangi grid
-                  dengan variabilitas berbeda.
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[var(--radius-lg)]">
-            <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-sm">Tab Teori antrian</CardTitle>
-              <CardDescription>
-                Modul lanjutan: Little's Law & Kingman vs hasil DES.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>
-                  <strong className="text-foreground">Little</strong> — L = λ·W; cek L_q DES vs
-                  λ·W_q dan λ·cycle ≈ N armada.
+                  <strong className="text-foreground">Antrian</strong> — panjang antrian request di
+                  crane vs waktu + hist wait.
                 </li>
                 <li>
-                  <strong className="text-foreground">Kingman (VUT)</strong> — prediksi W_q dari
-                  utilisasi × variabilitas; bandingkan error % vs DES.
-                </li>
-                <li>
-                  Kurva W_q vs ρ: utilisasi tinggi → antrian prediksi naik tajam.
-                </li>
-                <li>
-                  Prediksi bisa beda dari DES (fleet tertutup, horizon pendek, multi-server).
-                  Keputusan fleet tetap dari Ringkasan & Perbandingan.
+                  <strong className="text-foreground">Multi-seed</strong> — sebaran thr / util.
                 </li>
               </ul>
             </CardContent>
@@ -316,9 +356,9 @@ function ManualPage() {
 
         <Separator />
 
-        {/* —— Rumus singkat —— */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">4. Rumus singkat (edukasi)</h2>
+        {/* —— Rumus —— */}
+        <section id="rumus" className="scroll-mt-20 space-y-3">
+          <h2 className="text-sm font-semibold tracking-tight">6. Rumus singkat</h2>
           <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-border">
             <table className="w-full min-w-[320px] text-left text-sm">
               <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
@@ -338,25 +378,23 @@ function ManualPage() {
                 </tr>
                 <tr className="border-b border-border/80">
                   <td className="px-3 py-2 font-medium text-foreground">Match factor</td>
-                  <td className="px-3 py-2">
-                    Kap. hauling / kap. loading (≈1 seimbang)
-                  </td>
+                  <td className="px-3 py-2">Kap. hauling / kap. loading (≈1 seimbang)</td>
                 </tr>
                 <tr className="border-b border-border/80">
-                  <td className="px-3 py-2 font-medium text-foreground">Kap. loading teori</td>
-                  <td className="px-3 py-2">n_L × (60 / t_load) × payload</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Wait (request→service)</td>
+                  <td className="px-3 py-2">Waktu dari minta lift sampai crane mulai melayani</td>
                 </tr>
                 <tr className="border-b border-border/80">
-                  <td className="px-3 py-2 font-medium text-foreground">Kap. hauling teori</td>
-                  <td className="px-3 py-2">n_H × (60 / t_cycle) × payload</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Starvation %</td>
+                  <td className="px-3 py-2">Request belum dilayani di akhir shift ÷ total request</td>
                 </tr>
                 <tr className="border-b border-border/80">
-                  <td className="px-3 py-2 font-medium text-foreground">Biaya total</td>
-                  <td className="px-3 py-2">Σ (n × tarif/jam × jam) — all-in = sewa + operator</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Wait vs prio-1</td>
+                  <td className="px-3 py-2">Wait avg front ÷ wait avg front prioritas terbaik</td>
                 </tr>
                 <tr className="border-b border-border/80">
-                  <td className="px-3 py-2 font-medium text-foreground">Biaya waiting</td>
-                  <td className="px-3 py-2">Jam·unit antri hauler × tarif hauler</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Waste crew</td>
+                  <td className="px-3 py-2">(Σ wait menit / 60) × tarif crew front (Rp/jam)</td>
                 </tr>
                 <tr className="border-b border-border/80">
                   <td className="px-3 py-2 font-medium text-foreground">Biaya satuan</td>
@@ -365,103 +403,277 @@ function ManualPage() {
                 <tr className="border-b border-border/80">
                   <td className="px-3 py-2 font-medium text-foreground">Emisi</td>
                   <td className="px-3 py-2">
-                    Jam kerja × EF kerja + jam idle/antri × EF idle; EF ≈ L/jam ×{" "}
-                    {DIESEL_KG_CO2_PER_L}
+                    Jam kerja × EF kerja + jam idle × EF idle; EF ≈ L/jam × {DIESEL_KG_CO2_PER_L}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-2 font-medium text-foreground">Emisi satuan</td>
-                  <td className="px-3 py-2">Emisi total ÷ volume</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Poisson request</td>
+                  <td className="px-3 py-2">
+                    Inter-arrival ~ Exp(mean); rate λ = 1/mean (permintaan/menit)
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Default sewa & solar disetel ke orde pasar Indonesia untuk excavator ~0,5 m³
-            dan dump truck ~4 m³ (earthmoving). Operasi lain punya default sendiri.
-          </p>
         </section>
 
         <Separator />
 
-        {/* —— Skenario & export —— */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">5. Skenario & export</h2>
-          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-            <li>
-              <strong className="text-foreground">Skenario</strong> (header) — simpan parameter
-              di browser (localStorage), muat kembali, atau hapus.
-            </li>
-            <li>
-              <strong className="text-foreground">CSV</strong> — unduh ringkasan KPI + log
-              siklus untuk laporan / spreadsheet.
-            </li>
-            <li>
-              <strong className="text-foreground">Reset default</strong> — mengembalikan
-              parameter operasi yang sedang dipilih ke default bawaan.
-            </li>
-          </ul>
+        {/* —— Per operasi detail —— */}
+        <section className="space-y-6">
+          <h2 className="text-sm font-semibold tracking-tight">7. Manual per operasi</h2>
+
+          {/* EARTHMOVING */}
+          <Card id="earthmoving" className="scroll-mt-20 rounded-[var(--radius-lg)]">
+            <CardHeader className="space-y-1 p-4 pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm">Earthmoving</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  Level 1 · paling sederhana
+                </Badge>
+              </div>
+              <CardDescription>
+                1 siklus · excavator (server load) + dump truck (cycle hauler)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
+              <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+                <img
+                  src="/illustrations/earthmoving-cycle.jpg"
+                  alt="Earthmoving"
+                  className="mx-auto max-h-48 w-full object-contain"
+                  loading="lazy"
+                />
+              </figure>
+              <p>
+                <strong className="text-foreground">Siklus:</strong> Load → Haul → Dump → Return.
+                Volume per trip = kapasitas bak truck. Produksi dihitung saat dump selesai.
+              </p>
+              <p>
+                <strong className="text-foreground">Parameter kunci:</strong> n excavator, n
+                truck, bucket m³, bak m³, mean+dist tiap fase, target siklus/volume, sewa, solar.
+              </p>
+              <p>
+                <strong className="text-foreground">Yang dipelajari:</strong> match factor,
+                bottleneck excavator vs truck, util, antrian di loading, biaya & emisi satuan,
+                sweet spot fleet di tab Perbandingan.
+              </p>
+              <ol className="list-decimal space-y-1 pl-5 text-xs">
+                <li>Jalankan default → baca util excavator & truck + bottleneck.</li>
+                <li>Ubah n truck ±2 → lihat thr, wait, biaya satuan.</li>
+                <li>Buka Perbandingan: cari sweet spot thr vs biaya vs emisi.</li>
+                <li>Naikkan CV → antrian dan gap sim–teori biasanya naik.</li>
+              </ol>
+            </CardContent>
+          </Card>
+
+          {/* BRICKLAYING */}
+          <Card id="bricklaying" className="scroll-mt-20 rounded-[var(--radius-lg)]">
+            <CardHeader className="space-y-1 p-4 pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm">Bricklaying</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  Level 2 · multi-siklus + buffer
+                </Badge>
+              </div>
+              <CardDescription>
+                3 siklus · helper (shared) + tukang + slot buffer batch
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
+              <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+                <img
+                  src="/illustrations/bricklaying-cycle.jpg"
+                  alt="Bricklaying"
+                  className="mx-auto max-h-48 w-full object-contain"
+                  loading="lazy"
+                />
+              </figure>
+              <p>
+                <strong className="text-foreground">Tugas (masing-masing 1 mean + dist):</strong>
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs sm:text-sm">
+                <li>
+                  <strong className="text-foreground">A Fetch</strong> — helper ambil batch dari
+                  pile jauh → temp (jika temp ≤ threshold)
+                </li>
+                <li>
+                  <strong className="text-foreground">B Lift bata</strong> — temp → slot scaffold
+                  (hanya jika ada slot kosong 1 batch)
+                </li>
+                <li>
+                  <strong className="text-foreground">B′ Mortar</strong> — ember mortar ke scaffold
+                  (tim mortar always-ready di ground)
+                </li>
+                <li>
+                  <strong className="text-foreground">C Pasang</strong> — tukang; butuh bata +
+                  mortar di scaffold
+                </li>
+              </ul>
+              <p>
+                <strong className="text-foreground">Default buffer:</strong> batch 20 bata ·
+                scaffold 3 slot (max 60) · temp 10 slot (max 200) · threshold fetch 60 · 3 ember
+                mortar (1 ember ≈ 20 bata) · 1 helper · 2 tukang.
+              </p>
+              <p>
+                <strong className="text-foreground">Yang dipelajari:</strong> shared resource
+                (helper multi-tugas), buffer terbatas, siapa menunggu siapa (tukang nunggu stock
+                scaffold).
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* CONCRETING */}
+          <Card id="concreting" className="scroll-mt-20 rounded-[var(--radius-lg)]">
+            <CardHeader className="space-y-1 p-4 pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm">Concreting (RMC placing)</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  Level 3 · dual-cycle berinteraksi
+                </Badge>
+              </div>
+              <CardDescription>
+                2 siklus: truck mixer plant↔site + placing di site (lewat buffer)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
+              <p>
+                <strong className="text-foreground">Siklus A — Truck mixer:</strong> Batch (plant)
+                → Haul → Discharge ke site buffer → Return. Shared untuk semua metode placing.
+              </p>
+              <p>
+                <strong className="text-foreground">Siklus B — Placing</strong> (pilih tab):
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs sm:text-sm">
+                <li>
+                  <strong className="text-foreground">Buggy</strong> — concrete buggy; jumlah
+                  buggy bisa ditambah
+                </li>
+                <li>
+                  <strong className="text-foreground">Crane bucket</strong> — 1 tower crane tetap;
+                  jumlah bucket terbatas kapasitas angkat
+                </li>
+                <li>
+                  <strong className="text-foreground">Pump</strong> — mobile pump; jumlah/kecepatan
+                  place bisa diubah
+                </li>
+              </ul>
+              <p>
+                <strong className="text-foreground">Site scenario (shared):</strong> jarak
+                horizontal & tinggi dari titik discharge truk ke pour point — membedakan cycle
+                time placing antar metode.
+              </p>
+              <p>
+                <strong className="text-foreground">Coupling:</strong> truck antri jika buffer
+                penuh; unit place antri jika buffer kosong. Produksi dihitung saat place selesai.
+              </p>
+              <p>
+                <strong className="text-foreground">Yang dipelajari:</strong> dual-cycle, buffer
+                sebagai coupling, perbandingan metode di skenario jarak/tinggi yang sama, biaya
+                place vs thr.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* TOWER CRANE */}
+          <Card id="tower" className="scroll-mt-20 rounded-[var(--radius-lg)]">
+            <CardHeader className="space-y-1 p-4 pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm">Tower Crane (multi-front)</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  Level 4 · paling kompleks
+                </Badge>
+              </div>
+              <CardDescription>
+                Banyak request · single server · prioritas non-preemptive
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
+              <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+                <img
+                  src="/illustrations/tower-crane-multi-front.jpg"
+                  alt="Tower crane"
+                  className="mx-auto max-h-48 w-full object-contain"
+                  loading="lazy"
+                />
+                <figcaption className="border-t border-border px-3 py-2 text-xs">
+                  Yard (material) terpisah → crane → Front A/B/C di bangunan
+                </figcaption>
+              </figure>
+              <p>
+                <strong className="text-foreground">Permintaan per front:</strong> proses Poisson
+                → inter-arrival default <strong className="text-foreground">Eksponensial</strong>{" "}
+                (mean menit antar minta).
+              </p>
+              <p>
+                <strong className="text-foreground">Service:</strong> satu durasi full trip
+                yard→front→return (mean + dist). Beda front = beda lokasi = beda mean.
+              </p>
+              <p>
+                <strong className="text-foreground">Antrian:</strong> prioritas 1 (tinggi) → 9
+                (rendah), non-preemptive, lalu FIFO. Default front A/B/C = prio 1/2/3.
+              </p>
+              <p>
+                <strong className="text-foreground">Stop:</strong> waktu operasi maks (default 8
+                jam). Tidak ada target volume.
+              </p>
+              <p>
+                <strong className="text-foreground">Indikator khusus:</strong>
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs sm:text-sm">
+                <li>
+                  <strong className="text-foreground">Wait request→service</strong> (avg, p50,
+                  p90, max) per front
+                </li>
+                <li>
+                  <strong className="text-foreground">Starvation %</strong> — request belum
+                  dilayani di akhir shift
+                </li>
+                <li>
+                  <strong className="text-foreground">Wait vs prio-1</strong> — seberapa “terhukum”
+                  front prioritas rendah
+                </li>
+                <li>
+                  <strong className="text-foreground">Waste crew</strong> — jam tunggu × tarif
+                  crew front (Rp/jam, bisa diedit)
+                </li>
+                <li>Util crane, antrian request, biaya crane + waste, emisi crane</li>
+              </ul>
+              <ol className="list-decimal space-y-1 pl-5 text-xs">
+                <li>Jalankan 8 jam default → bandingkan wait & starvation A vs C.</li>
+                <li>Tukar prioritas C=1, A=3 → lihat siapa yang “terhukum”.</li>
+                <li>Perpendek service mean / naikkan inter-arrival → turunkan util.</li>
+                <li>Coba 2 crane → util & wait turun; bandingkan waste crew.</li>
+              </ol>
+            </CardContent>
+          </Card>
         </section>
 
-        <Separator />
-
-        {/* —— Per operasi —— */}
+        {/* Dynamic catalog extras from OPERATIONS */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">6. Manual per operasi</h2>
-          <p className="text-sm text-muted-foreground">
-            Tiap operasi memakai engine cycle 2-resource yang sama; yang beda adalah label
-            tugas, default, satuan, dan interpretasi lapangan.
-          </p>
+          <h2 className="text-sm font-semibold tracking-tight">
+            Ringkasan katalog (otomatis dari app)
+          </h2>
           <ul className="space-y-3">
             {OPERATIONS.map((op) => (
               <li key={op.id}>
                 <Card className="rounded-[var(--radius-lg)]">
                   <CardHeader className="space-y-1 p-4 pb-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-sm">{op.title}</CardTitle>
+                      <CardTitle className="text-sm">{op.shortTitle}</CardTitle>
+                      <Badge variant="secondary" className="font-normal text-[10px]">
+                        {op.sidebarBlurb}
+                      </Badge>
                     </div>
-                    <CardDescription className="leading-relaxed">
-                      {op.description}
-                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
-                    {op.illustration ? (
-                      <figure className="mx-auto max-w-sm overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20 sm:max-w-md">
-                        <img
-                          src={op.illustration}
-                          alt={`Ilustrasi ${op.shortTitle}`}
-                          className="mx-auto h-auto max-h-40 w-full object-contain sm:max-h-48"
-                          loading="lazy"
-                        />
-                        {op.illustrationCaption ? (
-                          <figcaption className="border-t border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                            {op.illustrationCaption}
-                          </figcaption>
-                        ) : null}
-                      </figure>
-                    ) : null}
-                    <div className="flex flex-wrap gap-1.5">
-                      {op.tasks.map((task, i) => (
-                        <Badge key={task.key} variant="outline" className="font-normal">
-                          {i + 1}. {task.label}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-xs">
-                      <strong className="text-foreground">Resource:</strong> {op.loaderLabel}{" "}
-                      + {op.haulerLabel} ·{" "}
-                      <strong className="text-foreground">Satuan:</strong> {op.unit} ·{" "}
-                      <strong className="text-foreground">Durasi:</strong> {op.durationUnit}
-                    </p>
-                    <p className="text-xs leading-relaxed">{op.manual.summary}</p>
-                    <ol className="list-decimal space-y-1 pl-5 text-xs leading-relaxed">
+                  <CardContent className="space-y-2 p-4 pt-0 text-xs text-muted-foreground">
+                    <p className="leading-relaxed">{op.manual.summary}</p>
+                    <ol className="list-decimal space-y-1 pl-5">
                       {op.manual.howTo.map((h) => (
                         <li key={h}>{h}</li>
                       ))}
                     </ol>
-                    <p className="text-xs leading-relaxed text-muted-foreground/90">
-                      {op.manual.notes}
-                    </p>
+                    <p className="leading-relaxed">{op.manual.notes}</p>
                   </CardContent>
                 </Card>
               </li>
@@ -472,28 +684,40 @@ function ManualPage() {
         <Separator />
 
         {/* —— Tips —— */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-tight">7. Tips pembelajaran</h2>
+        <section id="tips" className="scroll-mt-20 space-y-3">
+          <h2 className="text-sm font-semibold tracking-tight">8. Tips & FAQ</h2>
           <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
             <li>
-              Mulai dari default earthmoving → jalankan → baca bottleneck & match factor.
+              Ikuti urutan sidebar: Earthmoving dulu, Tower Crane terakhir.
             </li>
             <li>
-              Ubah jumlah hauler ±2, bandingkan throughput, util, biaya satuan, emisi satuan.
+              Jangan andalkan satu seed untuk kesimpulan — pakai multi-seed bila ada.
             </li>
             <li>
-              Di Perbandingan, cari sweet spot: max produksi vs min biaya vs min karbon — sering
-              tidak di titik yang sama.
+              Gap sim vs teori besar? Cek variabilitas (CV), antrian, buffer penuh/kosong, atau
+              prioritas starvation.
             </li>
             <li>
-              Naikkan CV → antrian dan gap sim–teori biasanya membesar (efek variabilitas).
+              <strong className="text-foreground">Earthmoving:</strong> util excavator tinggi +
+              truck idle → tambah truck; sebaliknya util truck tinggi + excavator idle → kurangi
+              truck atau tambah excavator.
             </li>
             <li>
-              Multi-run: jangan andalkan satu seed untuk kesimpulan kelas/paper.
+              <strong className="text-foreground">Bricklaying:</strong> tukang sering wait →
+              scaffold/mortar kosong; helper util tinggi → bottleneck supply.
             </li>
             <li>
-              Bricklaying memakai cycle 2-resource. RMC dual-cycle: supply plant↔site berinteraksi
-              dengan place method di site (dolly / crane / pump) lewat buffer.
+              <strong className="text-foreground">Concreting:</strong> truck antri = buffer penuh
+              (place lambat); place idle = buffer kosong (supply lambat).
+            </li>
+            <li>
+              <strong className="text-foreground">Tower Crane:</strong> starvation tinggi di prio
+              rendah = crane jenuh; turunkan laju request, perpendek service, naikkan prio, atau
+              tambah crane.
+            </li>
+            <li>
+              Biaya & emisi satuan membantu memutuskan: thr maksimum jarang = biaya/emisi
+              minimum.
             </li>
           </ul>
         </section>
@@ -501,13 +725,12 @@ function ManualPage() {
         <Separator />
 
         <section className="space-y-2 text-sm text-muted-foreground">
-          <h2 className="text-sm font-semibold text-foreground">
-            Template operasi baru (pengembang)
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">Catatan pengembang</h2>
           <p className="leading-relaxed">
-            Operasi baru = entri katalog (tugas, resource, default, manual) +{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">defaultConfig(op)</code>{" "}
-            + engine cycle 2-resource + tab hasil yang sama. UI tidak perlu didesain ulang.
+            Operasi baru = entri di katalog <code className="rounded bg-muted px-1 text-xs">operations.ts</code>{" "}
+            (termasuk <code className="rounded bg-muted px-1 text-xs">sidebarBlurb</code> + manual)
+            + engine DES + panel parameter + (opsional) panel hasil khusus. Sidebar otomatis
+            mengikuti urutan array OPERATIONS.
           </p>
         </section>
 
@@ -518,7 +741,7 @@ function ManualPage() {
         </div>
 
         <p className="pb-6 text-center text-xs text-muted-foreground">
-          SiklOps · Manual umum · Pembaruan mengikuti fitur aplikasi
+          SiklOps · Manual lengkap · Earthmoving · Bricklaying · Concreting · Tower Crane
         </p>
       </main>
     </div>
