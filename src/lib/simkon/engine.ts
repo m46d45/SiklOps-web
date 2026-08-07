@@ -17,6 +17,11 @@ import {
   isBrickOperation,
   runBrickTripleSimulation,
 } from "./brickEngine";
+import {
+  applyTowerCraneToConfig,
+  isTowerCraneOperation,
+  runTowerCraneSimulation,
+} from "./towerCraneEngine";
 
 export const APP_VERSION = "1.1";
 export const DIESEL_KG_CO2_PER_L = 2.68;
@@ -256,6 +261,12 @@ export type SimulationConfig = {
   lay_take_mean?: number;
   lay_place_mean?: number;
   lay_finish_mean?: number;
+  /* Tower crane multi-front */
+  num_cranes?: number;
+  capacity_ton?: number;
+  heavy_load_factor?: number;
+  fronts?: unknown;
+  crane_fronts_json?: string;
 };
 
 
@@ -507,6 +518,9 @@ export function defaultConfig(operation: OperationType = "earthmoving"): Simulat
   if (isBrickOperation(operation)) {
     return applyBrickToConfig(base);
   }
+  if (isTowerCraneOperation(operation)) {
+    return applyTowerCraneToConfig(base);
+  }
   return base;
 }
 
@@ -517,6 +531,9 @@ export function runSimulation(configIn: SimulationConfig): SimulationResult {
   }
   if (isBrickOperation(configIn.operation)) {
     return runBrickTripleSimulation(configIn);
+  }
+  if (isTowerCraneOperation(configIn.operation)) {
+    return runTowerCraneSimulation(configIn);
   }
   const haulerCap = Math.max(0.01, configIn.hauler_capacity_m3 ?? configIn.payload_per_trip ?? 4);
   const op = (configIn.operation || "earthmoving") as OperationType;

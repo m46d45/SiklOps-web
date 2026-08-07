@@ -1,4 +1,4 @@
-import { BookOpen, Construction, Layers, Truck } from "lucide-react";
+import { ArrowUpFromLine, BookOpen, Construction, Layers, Truck } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import {
   OPERATIONS,
@@ -11,6 +11,7 @@ const ICONS: Record<OperationId, typeof Truck> = {
   earthmoving: Truck,
   bricklaying: Layers,
   concreting: Construction,
+  tower_crane: ArrowUpFromLine,
 };
 
 type Props = {

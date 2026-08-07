@@ -30,6 +30,7 @@ import { ParameterPanel } from "@/components/simkon/ParameterPanel";
 import { ResultsPanel } from "@/components/simkon/ResultsPanel";
 import { ConcretingPanel } from "@/components/simkon/ConcretingPanel";
 import { BricklayingPanel } from "@/components/simkon/BricklayingPanel";
+import { TowerCranePanel } from "@/components/simkon/TowerCranePanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -261,7 +262,8 @@ function SiklOpsApp() {
             <CardContent className="space-y-4">
               {operation.illustration &&
               operation.id !== "concreting" &&
-              operation.id !== "bricklaying" ? (
+              operation.id !== "bricklaying" &&
+              operation.id !== "tower_crane" ? (
                 <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20 sm:max-w-lg">
                   <img
                     src={operation.illustration}
@@ -276,7 +278,9 @@ function SiklOpsApp() {
                   ) : null}
                 </figure>
               ) : null}
-              {operation.id !== "concreting" && operation.id !== "bricklaying" ? (
+              {operation.id !== "concreting" &&
+              operation.id !== "bricklaying" &&
+              operation.id !== "tower_crane" ? (
                 <div>
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Tugas (task)
@@ -298,13 +302,17 @@ function SiklOpsApp() {
                       ? "Batching plant · Truck mixer · Buggy / Crane / Pump"
                       : operation.id === "bricklaying"
                         ? "Helper (fetch+lift) · Tukang · Temp & scaffold buffer"
-                        : `${operation.loaderLabel} · ${operation.haulerLabel}`
+                        : operation.id === "tower_crane"
+                          ? "Tower crane · 1–5 work fronts · priority queue"
+                          : `${operation.loaderLabel} · ${operation.haulerLabel}`
                   }
                 />
                 <MetaItem label="Satuan volume" value={operation.unit} />
                 <MetaItem
                   label={
-                    operation.id === "concreting" || operation.id === "bricklaying"
+                    operation.id === "concreting" ||
+                    operation.id === "bricklaying" ||
+                    operation.id === "tower_crane"
                       ? "Model"
                       : "Durasi"
                   }
@@ -313,7 +321,9 @@ function SiklOpsApp() {
                       ? "Dual-cycle · 3 metode place"
                       : operation.id === "bricklaying"
                         ? "Triple-cycle · helper A/B + tukang"
-                        : operation.durationUnit
+                        : operation.id === "tower_crane"
+                          ? "Single-server · multi-front priority"
+                          : operation.durationUnit
                   }
                 />
               </div>
@@ -374,6 +384,8 @@ function SiklOpsApp() {
             <ConcretingPanel />
           ) : operation.id === "bricklaying" ? (
             <BricklayingPanel />
+          ) : operation.id === "tower_crane" ? (
+            <TowerCranePanel />
           ) : (
             <>
           <Card className="rounded-[var(--radius-xl)]">

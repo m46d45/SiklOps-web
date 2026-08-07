@@ -3,7 +3,11 @@
  * Earthmoving · Bricklaying · Concreting (3 metode place) memakai interface yang sama.
  */
 
-export type OperationId = "earthmoving" | "bricklaying" | "concreting";
+export type OperationId =
+  | "earthmoving"
+  | "bricklaying"
+  | "concreting"
+  | "tower_crane";
 
 /** Alias lama skenario tersimpan (RMC 3-op → concreting) */
 const LEGACY_OP: Record<string, OperationId> = {
@@ -230,6 +234,60 @@ export const OPERATIONS: OperationInfo[] = [
       ],
       notes:
         "Dual-cycle + site buffer. Production counted at place completion. Who waits whom: trucks wait if buffer full; place waits if buffer empty.",
+    },
+  },
+  {
+    id: "tower_crane",
+    title: "Tower Crane (multi-front)",
+    shortTitle: "Tower Crane",
+    description:
+      "Satu tower crane melayani 1–5 front pekerjaan. Material dari yard diangkat ke masing-masing front dengan sistem prioritas. Ukuran sibuk crane dan bottleneck terhadap pekerjaan lain.",
+    tasks: [
+      { key: "load", label: "Hook / sling" },
+      { key: "haul", label: "Hoist + swing" },
+      { key: "dump", label: "Lower + unhook" },
+      { key: "return", label: "Return empty" },
+    ],
+    taskLabels: ["Hook", "Hoist+swing", "Lower+unhook", "Return empty"],
+    loaderLabel: "Tower crane",
+    haulerLabel: "Work front",
+    loaderCapacityLabel: "Kapasitas angkat (ton)",
+    haulerCapacityLabel: "Volume per lift",
+    unit: "unit",
+    durationUnit: "menit",
+    sinceVersion: "1.2",
+    available: true,
+    defaults: {
+      num_loaders: 1,
+      num_haulers: 3,
+      loader_bucket: 1,
+      hauler_capacity: 1,
+      load: 1.5,
+      haul: 2.5,
+      dump: 2,
+      return: 1.5,
+      target_cycles: 50,
+      target_volume: 40,
+      cost_loader: 500_000,
+      cost_hauler: 0,
+      cost_loader_operator: 150_000,
+      cost_hauler_operator: 0,
+      fuel_loader_work: 12,
+      fuel_loader_idle: 4,
+      fuel_hauler_work: 0,
+      fuel_hauler_idle: 0,
+    },
+    manual: {
+      summary:
+        "Single-server multi-client: tower crane + N front. Antrian request diurut prioritas (1=tertinggi), lalu FIFO.",
+      howTo: [
+        "Aktifkan 1–5 front; set prioritas dan cycle time tiap front.",
+        "Set kapasitas angkat (ton); beban > kapasitas ditolak/retry.",
+        "Jalankan sim — lihat util crane, antrian, wait per front.",
+        "Front prioritas rendah menunggu lebih lama saat crane jenuh.",
+      ],
+      notes:
+        "Bottleneck tipikal = crane util tinggi + antrian lift. Naikkan prioritas front kritis atau kurangi frekuensi minta material.",
     },
   },
 
