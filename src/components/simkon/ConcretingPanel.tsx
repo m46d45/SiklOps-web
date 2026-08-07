@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/select";
 import { ResultsPanel } from "@/components/simkon/ResultsPanel";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -201,11 +200,6 @@ function rebuildDist(base: DurationDist, kind: DistKind, cv: number): DurationDi
 }
 
 
-function suitBadge(s: string) {
-  if (s === "baik") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
-  if (s === "buruk") return "bg-red-500/15 text-red-700 dark:text-red-300";
-  return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
-}
 
 export function ConcretingPanel() {
   const [site, setSite] = useState<SiteScenario>({ ...DEFAULT_SITE });
