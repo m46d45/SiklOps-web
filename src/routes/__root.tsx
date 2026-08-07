@@ -20,8 +20,10 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "SiklOps: simulasi siklus operasi konstruksi (DES). v1.0 Earthmoving; multi-operasi di versi berikutnya.",
+          "SiklOps: simulasi siklus operasi konstruksi (DES). Earthmoving, bricklaying, concreting (RMC placing).",
       },
+      { name: "theme-color", content: "#1e3a32" },
+      { name: "application-name", content: APP_NAME },
       ...(ogImage
         ? [
             { property: "og:image", content: ogImage },
@@ -30,7 +32,14 @@ export const Route = createRootRoute({
           ]
         : []),
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon.png", type: "image/png", sizes: "32x32" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "manifest", href: "/site.webmanifest" },
+    ],
   }),
   component: RootShell,
 });
