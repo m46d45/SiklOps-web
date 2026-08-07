@@ -430,7 +430,7 @@ function SiklOpsApp() {
           )}
 
           <footer className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
-            SiklOps v{APP_VERSION} · Template multi-operasi · DES · Pembelajaran
+            SiklOps v{APP_VERSION} · DES · Pembelajaran
           </footer>
         </main>
       </div>
