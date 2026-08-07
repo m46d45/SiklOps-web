@@ -29,6 +29,7 @@ import { OperationSidebar } from "@/components/simkon/OperationSidebar";
 import { ParameterPanel } from "@/components/simkon/ParameterPanel";
 import { ResultsPanel } from "@/components/simkon/ResultsPanel";
 import { ConcretingPanel } from "@/components/simkon/ConcretingPanel";
+import { BricklayingPanel } from "@/components/simkon/BricklayingPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -258,7 +259,9 @@ function SiklOpsApp() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {operation.illustration && operation.id !== "concreting" ? (
+              {operation.illustration &&
+              operation.id !== "concreting" &&
+              operation.id !== "bricklaying" ? (
                 <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20 sm:max-w-lg">
                   <img
                     src={operation.illustration}
@@ -273,7 +276,7 @@ function SiklOpsApp() {
                   ) : null}
                 </figure>
               ) : null}
-              {operation.id !== "concreting" ? (
+              {operation.id !== "concreting" && operation.id !== "bricklaying" ? (
                 <div>
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Tugas (task)
@@ -293,16 +296,24 @@ function SiklOpsApp() {
                   value={
                     operation.id === "concreting"
                       ? "Batching plant · Truck mixer · Buggy / Crane / Pump"
-                      : `${operation.loaderLabel} · ${operation.haulerLabel}`
+                      : operation.id === "bricklaying"
+                        ? "Helper (fetch+lift) · Tukang · Temp & scaffold buffer"
+                        : `${operation.loaderLabel} · ${operation.haulerLabel}`
                   }
                 />
                 <MetaItem label="Satuan volume" value={operation.unit} />
                 <MetaItem
-                  label={operation.id === "concreting" ? "Model" : "Durasi"}
+                  label={
+                    operation.id === "concreting" || operation.id === "bricklaying"
+                      ? "Model"
+                      : "Durasi"
+                  }
                   value={
                     operation.id === "concreting"
                       ? "Dual-cycle · 3 metode place"
-                      : operation.durationUnit
+                      : operation.id === "bricklaying"
+                        ? "Triple-cycle · helper A/B + tukang"
+                        : operation.durationUnit
                   }
                 />
               </div>
@@ -361,6 +372,8 @@ function SiklOpsApp() {
 
           {operation.id === "concreting" ? (
             <ConcretingPanel />
+          ) : operation.id === "bricklaying" ? (
+            <BricklayingPanel />
           ) : (
             <>
           <Card className="rounded-[var(--radius-xl)]">

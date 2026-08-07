@@ -12,6 +12,11 @@ import {
   rmcDualDefaults,
   runRmcDualSimulation,
 } from "./rmcEngine";
+import {
+  applyBrickToConfig,
+  isBrickOperation,
+  runBrickTripleSimulation,
+} from "./brickEngine";
 
 export const APP_VERSION = "1.1";
 export const DIESEL_KG_CO2_PER_L = 2.68;
@@ -232,6 +237,25 @@ export type SimulationConfig = {
   place_travel_dist?: DurationDist | null;
   place_place_dist?: DurationDist | null;
   place_return_dist?: DurationDist | null;
+  /* Triple-cycle bricklaying (opsional) */
+  num_helpers?: number;
+  num_masons?: number;
+  fetch_payload_m2?: number;
+  lift_payload_m2?: number;
+  lay_payload_m2?: number;
+  temp_buffer_m2?: number;
+  scaffold_buffer_m2?: number;
+  fetch_travel_mean?: number;
+  fetch_load_mean?: number;
+  fetch_unload_mean?: number;
+  fetch_return_mean?: number;
+  lift_take_mean?: number;
+  lift_climb_mean?: number;
+  lift_unload_mean?: number;
+  lift_return_mean?: number;
+  lay_take_mean?: number;
+  lay_place_mean?: number;
+  lay_finish_mean?: number;
 };
 
 
@@ -480,6 +504,9 @@ export function defaultConfig(operation: OperationType = "earthmoving"): Simulat
       place_return_mean: rd.place_return,
     });
   }
+  if (isBrickOperation(operation)) {
+    return applyBrickToConfig(base);
+  }
   return base;
 }
 
@@ -487,6 +514,9 @@ export function defaultConfig(operation: OperationType = "earthmoving"): Simulat
 export function runSimulation(configIn: SimulationConfig): SimulationResult {
   if (isRmcOperation(configIn.operation)) {
     return runRmcDualSimulation(configIn);
+  }
+  if (isBrickOperation(configIn.operation)) {
+    return runBrickTripleSimulation(configIn);
   }
   const haulerCap = Math.max(0.01, configIn.hauler_capacity_m3 ?? configIn.payload_per_trip ?? 4);
   const op = (configIn.operation || "earthmoving") as OperationType;
