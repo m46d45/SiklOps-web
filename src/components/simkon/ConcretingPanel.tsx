@@ -444,6 +444,24 @@ export function ConcretingPanel() {
               onChange={(v) => patchSite({ truck_capacity_m3: v })}
             />
             <Field
+              label="Sewa truck mixer"
+              unit="ribu Rp/jam"
+              value={truckCost / 1000}
+              min={0}
+              max={2000}
+              step={5}
+              onChange={(v) => setTruckCost(v * 1000)}
+            />
+            <Field
+              label="Operator truck mixer"
+              unit="ribu Rp/jam"
+              value={truckOpCost / 1000}
+              min={0}
+              max={1000}
+              step={5}
+              onChange={(v) => setTruckOpCost(v * 1000)}
+            />
+            <Field
               label="Seed"
               value={site.seed}
               min={1}
@@ -695,9 +713,10 @@ export function ConcretingPanel() {
                     </p>
                     <div className="space-y-3 rounded-[var(--radius-lg)] border border-border bg-muted/20 p-3 sm:p-4">
                       <div>
-                        <p className="text-sm font-medium">Resource & biaya (Cycle B + truck mixer)</p>
+                        <p className="text-sm font-medium">Resource & biaya placing (Cycle B)</p>
                         <p className="text-xs text-muted-foreground">
-                          Biaya sewa dalam ribu Rp/jam (×1000). Operator ditambahkan (all-in).
+                          Hanya alat place. Truck mixer (jumlah, kapasitas, sewa, operator) di Site scenario
+                          — shared untuk ketiga metode. Biaya ribu Rp/jam (×1000), all-in.
                         </p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -753,34 +772,6 @@ export function ConcretingPanel() {
                             setPlaceOpCost((c) => ({ ...c, [m]: v * 1000 }))
                           }
                         />
-                        <Field
-                          label="Sewa truck mixer"
-                          unit="ribu Rp/jam"
-                          value={truckCost / 1000}
-                          min={0}
-                          max={2000}
-                          step={5}
-                          onChange={(v) => setTruckCost(v * 1000)}
-                        />
-                        <Field
-                          label="Operator truck mixer"
-                          unit="ribu Rp/jam"
-                          value={truckOpCost / 1000}
-                          min={0}
-                          max={1000}
-                          step={5}
-                          onChange={(v) => setTruckOpCost(v * 1000)}
-                        />
-                        <Field
-                          label="Jumlah truck mixer"
-                          value={site.num_trucks}
-                          min={1}
-                          max={20}
-                          step={1}
-                          onChange={(v) =>
-                            patchSite({ num_trucks: Math.max(1, Math.floor(v)) })
-                          }
-                        />
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {m === "pump" ? (
@@ -830,17 +821,6 @@ export function ConcretingPanel() {
                           />
                         )}
                         <Field
-                          label="Kapasitas truck mixer"
-                          unit="m³"
-                          value={site.truck_capacity_m3}
-                          min={3}
-                          max={12}
-                          step={0.5}
-                          onChange={(v) =>
-                            patchSite({ truck_capacity_m3: Math.max(3, v) })
-                          }
-                        />
-                        <Field
                           label="Kapasitas site buffer"
                           unit="m³"
                           value={site.buffer_capacity_m3}
@@ -853,14 +833,18 @@ export function ConcretingPanel() {
                         />
                       </div>
                       <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        Estimasi biaya/jam armada:{" "}
+                        Estimasi biaya/jam alat place:{" "}
                         <strong className="text-foreground">
                           {(
-                            (numPlace[m] * (placeCost[m] + placeOpCost[m]) +
-                              site.num_trucks * (truckCost + truckOpCost)) /
+                            (numPlace[m] * (placeCost[m] + placeOpCost[m])) /
                             1000
                           ).toFixed(0)}{" "}
                           ribu Rp/jam
+                        </strong>
+                        {" · "}truck mixer (shared):{" "}
+                        <strong className="text-foreground">
+                          {site.num_trucks}×{(truckCost + truckOpCost) / 1000} ribu
+                          Rp/jam
                         </strong>
                         {m === "pump" ? (
                           <>
@@ -884,8 +868,7 @@ export function ConcretingPanel() {
                         )}
                       </p>
                       <p className="text-[10px] leading-relaxed text-muted-foreground/90">
-                        {prof.market_note} Truck mixer default 7 m³, sewa ±Rp 350 rb/jam +
-                        operator ±Rp 100 rb/jam (estimasi pasar Indonesia, bisa diubah).
+                        {prof.market_note}
                       </p>
                     </div>
                     <div className="space-y-2">
