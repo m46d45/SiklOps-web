@@ -364,12 +364,13 @@ function ThroughputChart({
     <Card className="rounded-[var(--radius-xl)]">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Throughput ({unit}/jam) — sim vs teoritis</CardTitle>
-        <CardDescription>
-          Garis <strong className="text-foreground">tebal</strong> = hasil simulasi DES.
-          Garis <strong className="text-foreground">putus-putus</strong> = teoritis min(kap.
-          {labels.loader.toLowerCase()}, kap. {labels.hauler.toLowerCase()}) tanpa antrian.
-          Saat {labels.hauler.toLowerCase()} bertambah, teori naik lalu mendatar di plafon
-          place; naikkan {labels.loader.toLowerCase()} → plafon teori ikut naik.
+        <CardDescription className="leading-relaxed">
+          <strong className="text-foreground">Tebal</strong> = DES (antrian, buffer, variasi, who-waits).{" "}
+          <strong className="text-foreground">Putus-putus</strong> = batas atas teoritis tanpa
+          antrian: min(kap. place, kap. truck). Dual-cycle RMC: place = n<sub>P</sub>×(60/t
+          <sub>place</sub>)×place_cap; truck = n<sub>T</sub>×(60/t<sub>truck</sub>)×drum. Sim
+          biasanya <em>di bawah</em> teori (gap 5–25% normal); gap besar berarti masih ada
+          bottleneck/interferensi.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -438,7 +439,7 @@ function ThroughputChart({
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {loaders.map((nL) => (
             <li key={nL}>
-              Plafon loading teori ×{nL}:{" "}
+              Plafon place teori ×{nL}:{" "}
               <span className="font-mono tabular-nums text-foreground">
                 {formatNum(loaderCeilings[nL] ?? 0, 1)}
               </span>{" "}

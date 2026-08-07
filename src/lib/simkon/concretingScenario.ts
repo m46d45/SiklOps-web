@@ -275,14 +275,13 @@ export function derivePlaceCycle(
     };
   }
 
-  // pump
-  // setup boom + pumping; resistance grows with D and H
-  const fill = 1.0; // charge hopper from truck (partial — rest is truck discharge)
-  const basePump = 1.2;
-  const linePenalty = D / 80 + H / 40; // menit ekstra
-  const travel = Math.max(1.0, basePump + linePenalty); // "pump/travel" through line
-  const place = 1.0 + H / 50;
-  const ret = 0.6; // reposition hose tip
+  // pump — cycle per pulse volume; waktu place mendekati debit teoritis (~30 m³/jam default)
+  // setup charge + pumping line + tip place + reset; line time naik dengan D & H
+  const fill = 0.5; // charge hopper dari buffer
+  const line = Math.max(0.4, D / 120 + H / 60); // resistansi pipa (mnt)
+  const place = 0.6; // di ujung hose
+  const ret = 0.35; // reset tip
+  const travel = Math.max(0.6, 0.5 + line); // "pump through line"
   const cycle = fill + travel + place + ret;
   let suitability: DerivedPlaceCycle["suitability"] = "baik";
   let note = "Pump excels for significant distance/height and continuous volume.";
