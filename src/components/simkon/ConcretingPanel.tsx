@@ -820,17 +820,6 @@ export function ConcretingPanel() {
                             }
                           />
                         )}
-                        <Field
-                          label="Kapasitas site buffer"
-                          unit="m³"
-                          value={site.buffer_capacity_m3}
-                          min={1}
-                          max={30}
-                          step={0.5}
-                          onChange={(v) =>
-                            patchSite({ buffer_capacity_m3: Math.max(1, v) })
-                          }
-                        />
                       </div>
                       <p className="text-[11px] leading-relaxed text-muted-foreground">
                         Estimasi biaya/jam alat place:{" "}
