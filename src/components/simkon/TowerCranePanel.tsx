@@ -397,6 +397,15 @@ export function TowerCranePanel() {
                           step={0.1}
                           onChange={(v) => patchFront(fr.id, { volume_per_lift: v })}
                         />
+                        <Field
+                          label="Tarif crew front"
+                          unit="ribu Rp/jam"
+                          value={fr.crew_cost_per_hour / 1000}
+                          min={0}
+                          max={1000}
+                          step={5}
+                          onChange={(v) => patchFront(fr.id, { crew_cost_per_hour: v * 1000 })}
+                        />
                       </div>
                       <DistRow
                         label="Permintaan (inter-arrival)"

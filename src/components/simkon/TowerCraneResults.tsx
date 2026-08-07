@@ -32,17 +32,26 @@ export type TowerFrontStat = {
   priority: number;
   lifts: number;
   volume: number;
-  /** request → mulai dilayani crane (menit) */
   wait_avg: number;
   wait_max: number;
   wait_p50: number;
   wait_p90: number;
   wait_total: number;
   requests: number;
+  unserved: number;
+  starvation_rate: number;
+  wait_ratio_vs_p1: number;
+  crew_cost_per_hour: number;
+  waste_cost: number;
 };
 
 type Props = {
-  result: SimulationResult & { front_stats?: TowerFrontStat[] };
+  result: SimulationResult & {
+    front_stats?: TowerFrontStat[];
+    total_waste_cost?: number;
+    total_cost_with_waste?: number;
+    p1_wait_avg?: number;
+  };
 };
 
 export function TowerCraneResults({ result }: Props) {
@@ -195,6 +204,22 @@ export function TowerCraneResults({ result }: Props) {
                       avg · p50 {formatNum(s.wait_p50 ?? 0, 1)} · p90{" "}
                       {formatNum(s.wait_p90 ?? 0, 1)} · max {formatNum(s.wait_max ?? 0, 1)} mnt
                     </p>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Starvation{" "}
+                      <strong className="text-foreground">
+                        {formatPct(s.starvation_rate ?? 0)}
+                      </strong>{" "}
+                      ({s.unserved ?? 0} unserved) · Wait vs prio-1{" "}
+                      <strong className="text-foreground">
+                        ×{formatNum(s.wait_ratio_vs_p1 ?? 1, 2)}
+                      </strong>
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Waste crew{" "}
+                      <strong className="text-foreground">
+                        {formatMoney(s.waste_cost ?? 0, costs.currency)}
+                      </strong>
+                    </p>
                   </div>
                 ))}
               </div>
@@ -208,9 +233,22 @@ export function TowerCraneResults({ result }: Props) {
               hint={`${result.config.num_loaders} × ${formatMoney(costs.loader_rate, costs.currency)}/jam × ${formatNum(costs.hours, 2)} jam`}
             />
             <MetricCard
-              label="Biaya total"
+              label="Waste crew (tunggu)"
+              value={formatMoney(result.total_waste_cost ?? 0, costs.currency)}
+              hint="Σ (wait jam × tarif crew front)"
+            />
+            <MetricCard
+              label="Biaya total + waste"
+              value={formatMoney(
+                result.total_cost_with_waste ?? costs.cost_total,
+                costs.currency,
+              )}
+              hint="Sewa crane + waste crew di front"
+            />
+            <MetricCard
+              label="Biaya total (crane saja)"
               value={formatMoney(costs.cost_total, costs.currency)}
-              hint="Sewa crane (+ operator jika all-in)"
+              hint="Tanpa waste front"
             />
             <MetricCard
               label="Biaya satuan"
@@ -341,7 +379,9 @@ export function TowerCraneResults({ result }: Props) {
                     <th className="py-2 pr-3 font-medium">Lifts</th>
                     <th className="py-2 pr-3 font-medium">Volume</th>
                     <th className="py-2 pr-3 font-medium">Wait avg</th>
-                    <th className="py-2 pr-3 font-medium">Wait p50</th>
+                    <th className="py-2 pr-3 font-medium">vs prio-1</th>
+                    <th className="py-2 pr-3 font-medium">Starvation</th>
+                    <th className="py-2 pr-3 font-medium">Waste</th>
                     <th className="py-2 pr-3 font-medium">Wait p90</th>
                     <th className="py-2 font-medium">Wait max</th>
                   </tr>
@@ -355,7 +395,9 @@ export function TowerCraneResults({ result }: Props) {
                       <td className="py-2 pr-3">{s.lifts}</td>
                       <td className="py-2 pr-3">{formatNum(s.volume, 1)}</td>
                       <td className="py-2 pr-3 font-medium tabular-nums">{formatNum(s.wait_avg, 1)} mnt</td>
-                      <td className="py-2 pr-3 tabular-nums">{formatNum(s.wait_p50 ?? 0, 1)} mnt</td>
+                      <td className="py-2 pr-3 tabular-nums">×{formatNum(s.wait_ratio_vs_p1 ?? 1, 2)}</td>
+                      <td className="py-2 pr-3 tabular-nums">{formatPct(s.starvation_rate ?? 0)} ({s.unserved ?? 0})</td>
+                      <td className="py-2 pr-3 tabular-nums">{formatMoney(s.waste_cost ?? 0, costs.currency)}</td>
                       <td className="py-2 pr-3 tabular-nums">{formatNum(s.wait_p90 ?? 0, 1)} mnt</td>
                       <td className="py-2 tabular-nums">{formatNum(s.wait_max ?? 0, 1)} mnt</td>
                     </tr>

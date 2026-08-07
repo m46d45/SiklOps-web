@@ -40,6 +40,11 @@ export type CraneFront = {
   request_interval_mean: number;
   /** Mean durasi service crane untuk front ini (menit, full trip yard↔front) */
   service_mean: number;
+  /**
+   * Tarif crew di front (Rp/jam) untuk biaya waste tunggu.
+   * Default upah regu lapangan mid-ID.
+   */
+  crew_cost_per_hour: number;
   /** Distribusi inter-arrival (default exponential = Poisson process) */
   request_dist?: DurationDist | null;
   /** Distribusi service */
@@ -65,6 +70,7 @@ export function defaultFronts(): CraneFront[] {
       volume_per_lift: 1.2,
       request_interval_mean: 12,
       service_mean: 7.5,
+      crew_cost_per_hour: 120_000, // regu formwork
       request_dist: exp(12),
       service_dist: svc(7.5),
       enabled: true,
@@ -76,6 +82,7 @@ export function defaultFronts(): CraneFront[] {
       volume_per_lift: 0.8,
       request_interval_mean: 10,
       service_mean: 6.4,
+      crew_cost_per_hour: 100_000,
       request_dist: exp(10),
       service_dist: svc(6.4),
       enabled: true,
@@ -87,6 +94,7 @@ export function defaultFronts(): CraneFront[] {
       volume_per_lift: 1.0,
       request_interval_mean: 8,
       service_mean: 9.2,
+      crew_cost_per_hour: 130_000,
       request_dist: exp(8),
       service_dist: svc(9.2),
       enabled: true,
@@ -98,6 +106,7 @@ export function defaultFronts(): CraneFront[] {
       volume_per_lift: 0.5,
       request_interval_mean: 15,
       service_mean: 5.4,
+      crew_cost_per_hour: 90_000,
       request_dist: exp(15),
       service_dist: svc(5.4),
       enabled: false,
@@ -109,6 +118,7 @@ export function defaultFronts(): CraneFront[] {
       volume_per_lift: 0.4,
       request_interval_mean: 18,
       service_mean: 4.7,
+      crew_cost_per_hour: 80_000,
       request_dist: exp(18),
       service_dist: svc(4.7),
       enabled: false,
@@ -175,6 +185,10 @@ export function readTowerCraneFields(cfg: SimulationConfig): TowerCraneFields {
         volume_per_lift: Math.max(0.05, f.volume_per_lift ?? base.volume_per_lift),
         request_interval_mean: reqMean,
         service_mean: svcMean,
+        crew_cost_per_hour: Math.max(
+          0,
+          f.crew_cost_per_hour ?? base.crew_cost_per_hour ?? 100_000,
+        ),
         request_dist:
           f.request_dist ??
           fromMeanCv(reqMean, 1, "exponential" as DistKind),
@@ -257,15 +271,31 @@ export type FrontStats = {
   volume: number;
   /** mean wait request → mulai service (menit) */
   wait_avg: number;
-  /** max wait (menit) */
   wait_max: number;
-  /** median wait (menit) */
   wait_p50: number;
-  /** p90 wait (menit) */
   wait_p90: number;
-  /** total menit-tunggu (sum) */
   wait_total: number;
   requests: number;
+  /** request yang belum dilayani di akhir shift */
+  unserved: number;
+  /** unserved / requests (0–1) */
+  starvation_rate: number;
+  /** wait_avg / wait_avg_prio1 (≥1 berarti lebih lama dari front prio 1) */
+  wait_ratio_vs_p1: number;
+  /** tarif crew front (Rp/jam) */
+  crew_cost_per_hour: number;
+  /** waste = (wait_total/60) × crew_cost_per_hour */
+  waste_cost: number;
+};
+
+export type TowerCraneExtra = {
+  front_stats?: FrontStats[];
+  /** total waste crew semua front */
+  total_waste_cost?: number;
+  /** biaya crane + waste */
+  total_cost_with_waste?: number;
+  /** wait avg front prioritas terbaik */
+  p1_wait_avg?: number;
 };
 
 function percentile(sorted: number[], p: number): number {
@@ -274,9 +304,8 @@ function percentile(sorted: number[], p: number): number {
   return sorted[idx];
 }
 
-export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationResult & {
-  front_stats?: FrontStats[];
-} {
+export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationResult &
+  TowerCraneExtra {
   const f = readTowerCraneFields(configIn);
   const config = applyTowerCraneToConfig(configIn, f);
   const rng = new Rng(config.seed);
@@ -492,25 +521,60 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
   const avgQ = qIntegral / Math.max(horizon, 1e-9);
   const throughput = (totalVolume / horizon) * 60;
 
-  const front_stats: FrontStats[] = stats.map((s) => {
+  const front_stats_raw = stats.map((s) => {
     const sorted = [...s.waits].sort((a, b) => a - b);
+    const fr = frontById.get(s.id);
+    const unserved = Math.max(0, s.requests - s.lifts);
+    const wait_avg = sorted.length ? s.wait_total / sorted.length : 0;
+    const crew = fr?.crew_cost_per_hour ?? 0;
+    const waste_cost = (s.wait_total / 60) * crew;
     return {
       id: s.id,
       name: s.name,
       priority: s.priority,
       lifts: s.lifts,
       volume: s.volume,
-      wait_avg: sorted.length ? s.wait_total / sorted.length : 0,
+      wait_avg,
       wait_max: sorted.length ? sorted[sorted.length - 1] : 0,
       wait_p50: percentile(sorted, 0.5),
       wait_p90: percentile(sorted, 0.9),
       wait_total: s.wait_total,
       requests: s.requests,
+      unserved,
+      starvation_rate: s.requests > 0 ? unserved / s.requests : 0,
+      wait_ratio_vs_p1: 1, // filled below
+      crew_cost_per_hour: crew,
+      waste_cost,
     };
   });
 
-  // hauler util = fraction of front demand waiting? use front busy proxy via wait
+  // reference: best priority among active (min priority number)
+  const bestPrio = Math.min(...front_stats_raw.map((s) => s.priority));
+  const p1Waits = front_stats_raw.filter((s) => s.priority === bestPrio);
+  const p1_wait_avg =
+    p1Waits.length > 0
+      ? p1Waits.reduce((a, s) => a + s.wait_avg, 0) / p1Waits.length
+      : 0;
+  const front_stats: FrontStats[] = front_stats_raw.map((s) => ({
+    ...s,
+    wait_ratio_vs_p1:
+      p1_wait_avg > 1e-6
+        ? s.wait_avg / p1_wait_avg
+        : s.wait_avg > 0
+          ? 99
+          : 1,
+  }));
+
   const totalWait = front_stats.reduce((s, x) => s + x.wait_total, 0);
+  const total_waste_cost = front_stats.reduce((s, x) => s + x.waste_cost, 0);
+
+  // crane cost (sewa) for total_with_waste
+  const hours = horizon / 60;
+  const craneRate =
+    (config.cost_loader_per_hour || 0) +
+    (config.cost_all_in ? config.cost_loader_operator_per_hour || 0 : 0);
+  const crane_cost = nCrane * craneRate * hours;
+  const total_cost_with_waste = crane_cost + total_waste_cost;
 
   let bottleneck = "Seimbang";
   let bottleneck_reason = "Crane dan frekuensi request relatif seimbang.";
@@ -569,6 +633,9 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
     service_times: serviceTimes,
     wait_samples: waitSamples,
     front_stats,
+    total_waste_cost,
+    total_cost_with_waste,
+    p1_wait_avg,
   };
 }
 
