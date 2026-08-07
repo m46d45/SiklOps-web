@@ -132,7 +132,7 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     shortLabel: "Crane",
     placeLabel: "Crane bucket",
     description:
-      "Bucket diisi di ground, diangkat crane ke ketinggian place. Cocok struktur bertingkat.",
+      "1 tower crane tetap; bucket diisi di ground lalu diangkat. Jumlah bucket 1–3 (sirkulasi), tidak melebihi kapasitas angkat crane.",
     tasks: ["Fill bucket", "Lift / swing", "Place", "Return bucket"],
     // Bucket beton crane umum 0,5–1,5 m³; default 1 m³
     place_capacity_m3: 1,
@@ -147,10 +147,11 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     fuel_truck_work: 10,
     fuel_truck_idle: 2,
     illustration: "/illustrations/rmc-crane-cycle.jpg",
-    fleet_flexible: false,
-    max_place_units: 1,
+    // Jumlah yang di-sweep = bucket (bukan crane); crane fixed 1
+    fleet_flexible: true,
+    max_place_units: 3,
     market_note:
-      "Default ID: bucket 1 m³; alokasi sewa TC ±Rp 500 rb/jam + operator/rigger ±Rp 150 rb/jam (estimasi dari sewa bulanan).",
+      "Default ID: 1 tower crane + bucket 1 m³; sewa TC ±Rp 500 rb/jam + op ±Rp 150 rb/jam. Bucket max 3 (kapasitas angkat crane).",
   },
   pump: {
     method: "pump",

@@ -720,7 +720,37 @@ export function ConcretingPanel() {
                         </p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {prof.fleet_flexible ? (
+                        {m === "crane" ? (
+                          <>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">
+                                Tower crane
+                              </Label>
+                              <div className="flex h-9 items-center rounded-md border border-border bg-background px-3 text-sm tabular-nums">
+                                1{" "}
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  (fixed)
+                                </span>
+                              </div>
+                            </div>
+                            <Field
+                              label="Jumlah bucket"
+                              value={numPlace[m]}
+                              min={1}
+                              max={prof.max_place_units}
+                              step={1}
+                              onChange={(v) =>
+                                setNumPlace((p) => ({
+                                  ...p,
+                                  [m]: Math.min(
+                                    prof.max_place_units,
+                                    Math.max(1, Math.floor(v)),
+                                  ),
+                                }))
+                              }
+                            />
+                          </>
+                        ) : (
                           <Field
                             label={`Jumlah ${prof.placeLabel.toLowerCase()}`}
                             value={numPlace[m]}
@@ -737,18 +767,6 @@ export function ConcretingPanel() {
                               }))
                             }
                           />
-                        ) : (
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">
-                              Jumlah {prof.placeLabel.toLowerCase()}
-                            </Label>
-                            <div className="flex h-9 items-center rounded-md border border-border bg-background px-3 text-sm tabular-nums">
-                              {numPlace[m]}{" "}
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                (fixed — tidak ditambah)
-                              </span>
-                            </div>
-                          </div>
                         )}
                         <Field
                           label={`Sewa ${prof.placeLabel.toLowerCase()}`}

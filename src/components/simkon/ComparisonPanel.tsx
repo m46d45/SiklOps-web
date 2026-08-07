@@ -20,11 +20,12 @@ import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNum } from "@/lib/utils";
 
-/** Warna seri per jumlah excavator */
+/** Warna seri per jumlah place unit / loader */
 const SERIES_COLORS: Record<number, string> = {
   1: "#b06a2b",
   2: "#2f6b4f",
   3: "#3d6b8a",
+  4: "#7a4f8a",
 };
 
 type Props = {
@@ -32,7 +33,10 @@ type Props = {
 };
 
 export function ComparisonPanel({ baseConfig }: Props) {
-  const labels = resourceLabels(baseConfig.operation);
+  const labels = resourceLabels(
+    baseConfig.operation,
+    baseConfig.placement_method ?? null,
+  );
   const unit = labels.unit;
   const [cvSense, setCvSense] = useState(baseConfig.cv ?? 0.2);
 
@@ -40,9 +44,12 @@ export function ComparisonPanel({ baseConfig }: Props) {
     () => runComparisonGrid({ ...baseConfig, cv: cvSense }),
     [baseConfig, cvSense],
   );
-  const hints = useMemo(() => bestFleetHints(grid), [grid]);
+  const hints = useMemo(
+    () => bestFleetHints(grid, labels.loader),
+    [grid, labels.loader],
+  );
 
-  // Sweet spots per excavator count (min unit cost / min unit emission)
+  // Sweet spots per loader/place count
   const sweet = useMemo(() => {
     const out: Array<{ nL: number; costH: number; emiH: number; thrH: number }> = [];
     for (const nL of grid.loaders) {
@@ -98,7 +105,7 @@ export function ComparisonPanel({ baseConfig }: Props) {
             </li>
             <li>
               <strong className="text-foreground">Waktu tunggu antri rata-rata</strong> —
-              trade-off truck ekstra vs antrian di excavator.
+              trade-off hauler ekstra vs antrian di loading.
             </li>
             <li>
               <strong className="text-foreground">Panjang antrian rata-rata</strong> —
@@ -164,6 +171,7 @@ export function ComparisonPanel({ baseConfig }: Props) {
         loaders={grid.loaders}
         loaderCeilings={grid.loaderCeilings}
         op={baseConfig.operation}
+        method={baseConfig.placement_method}
       />
 
       <Card className="rounded-[var(--radius-xl)]">
@@ -213,7 +221,7 @@ export function ComparisonPanel({ baseConfig }: Props) {
       <div className="grid gap-4 lg:grid-cols-2">
         <CompareChart
           title="Waktu tunggu antri rata-rata (mnt)"
-          description="Rata-rata dump truck menunggu excavator per load."
+          description={`Rata-rata ${labels.hauler.toLowerCase()} menunggu ${labels.loader.toLowerCase()} per cycle.`}
           data={grid.byHauler}
           loaders={grid.loaders}
           yKeyPrefix="wait_"
@@ -222,7 +230,7 @@ export function ComparisonPanel({ baseConfig }: Props) {
         />
         <CompareChart
           title="Panjang antrian rata-rata"
-          description="Time-weighted rata-rata jumlah truck mengantri di loading."
+          description={`Time-weighted rata-rata jumlah ${labels.hauler.toLowerCase()} mengantri di place/loading.`}
           data={grid.byHauler}
           loaders={grid.loaders}
           yKeyPrefix="qlen_"
@@ -244,7 +252,7 @@ export function ComparisonPanel({ baseConfig }: Props) {
         />
         <CompareChart
           title={`Biaya waiting / waste (${baseConfig.cost_currency || "Rp"})`}
-          description="Jam·unit tunggu truck × tarif truck. Naik saat truck menumpuk di antrian loading."
+          description={`Jam·unit tunggu × tarif ${labels.hauler.toLowerCase()}. Naik saat armada hauler menumpuk di antrian.`}
           data={grid.byHauler}
           loaders={grid.loaders}
           yKeyPrefix="wcost_"
@@ -277,7 +285,7 @@ export function ComparisonPanel({ baseConfig }: Props) {
         />
         <CompareChart
           title="Emisi waiting / waste karbon (kg CO₂e)"
-          description="Jam antri truck × EF idle. Naik saat fleet hauler berlebih."
+          description={`Jam antri ${labels.hauler.toLowerCase()} × EF idle. Naik saat fleet hauler berlebih.`}
           data={grid.byHauler}
           loaders={grid.loaders}
           yKeyPrefix="wemi_"
@@ -310,7 +318,8 @@ export function ComparisonPanel({ baseConfig }: Props) {
             ))}
           </ul>
           <p className="mt-3 text-xs text-muted-foreground">
-            Basis: {baseConfig.num_loaders} excavator · {baseConfig.num_haulers} truck ·
+            Basis: {baseConfig.num_loaders} {labels.loader.toLowerCase()} ·{" "}
+            {baseConfig.num_haulers} {labels.hauler.toLowerCase()} ·
             payload {formatNum(baseConfig.payload_per_trip, 2)} {unit}/trip · seed{" "}
             {baseConfig.seed ?? "—"} · target {baseConfig.target_cycles} siklus /{" "}
             {formatNum(baseConfig.target_volume ?? 0, 0)} {unit}
@@ -327,14 +336,16 @@ function ThroughputChart({
   loaders,
   loaderCeilings,
   op,
+  method,
 }: {
   unit: string;
   data: Array<Record<string, number>>;
   loaders: readonly number[];
   loaderCeilings: Record<number, number>;
   op?: SimulationConfig["operation"];
+  method?: SimulationConfig["placement_method"];
 }) {
-  const labels = resourceLabels(op);
+  const labels = resourceLabels(op, method ?? null);
   return (
     <Card className="rounded-[var(--radius-xl)]">
       <CardHeader className="pb-2">
@@ -342,8 +353,9 @@ function ThroughputChart({
         <CardDescription>
           Garis <strong className="text-foreground">tebal</strong> = hasil simulasi DES.
           Garis <strong className="text-foreground">putus-putus</strong> = teoritis min(kap.
-          excavator, kap. truck) tanpa antrian. Saat truck bertambah, teori naik lalu
-          mendatar di plafon loading; naikkan excavator → plafon teori ikut naik.
+          {labels.loader.toLowerCase()}, kap. {labels.hauler.toLowerCase()}) tanpa antrian.
+          Saat {labels.hauler.toLowerCase()} bertambah, teori naik lalu mendatar di plafon
+          place; naikkan {labels.loader.toLowerCase()} → plafon teori ikut naik.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">

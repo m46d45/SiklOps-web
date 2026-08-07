@@ -49,7 +49,10 @@ const PHASE_ORDER = ["wait", "load", "haul", "dump", "return"] as const;
  * Standar tab hasil: Ringkasan (+ saran desain) | Perbandingan | Teori antrian
  */
 export function ResultsPanel({ result }: { result: SimulationResult }) {
-  const labels = resourceLabels(result.operation);
+  const labels = resourceLabels(
+    result.operation,
+    result.config.placement_method ?? null,
+  );
   const unit = labels.unit;
   const PHASE_LABELS = phaseLabelsFor(result.operation);
   const sys = analyzeSystem(result);
@@ -231,7 +234,7 @@ export function ResultsPanel({ result }: { result: SimulationResult }) {
               hint={`${result.total_trips} trip · ${formatNum(result.total_volume, 1)} ${unit}`}
             />
             <MetricCard
-              label="Trucks / excavator"
+              label={`${labels.hauler} / ${labels.loader}`}
               value={formatNum(result.config.num_haulers / Math.max(1, result.config.num_loaders), 2)}
               hint="Rasio armada aktual"
             />
@@ -258,7 +261,7 @@ export function ResultsPanel({ result }: { result: SimulationResult }) {
               <MetricCard
                 label="Biaya total fleet"
                 value={formatMoney(costs.cost_total, costs.currency)}
-                hint="Excavator + dump truck (sewa selama sim)"
+                hint={`${labels.loader} + ${labels.hauler} (sewa selama sim)`}
               />
               <MetricCard
                 label={`Biaya satuan (${costs.currency}/${unit})`}
@@ -294,7 +297,7 @@ export function ResultsPanel({ result }: { result: SimulationResult }) {
               <MetricCard
                 label="Emisi total"
                 value={formatKg(emissions.emission_total)}
-                hint="Excavator + dump truck"
+                hint={`${labels.loader} + ${labels.hauler}`}
               />
               <MetricCard
                 label={`Emisi satuan (kg/${unit})`}

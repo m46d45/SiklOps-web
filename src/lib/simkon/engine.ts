@@ -328,11 +328,24 @@ export type SimulationResult = {
   wait_samples: number[];
 };
 
-export function resourceLabels(op?: OperationType) {
+export function resourceLabels(
+  op?: OperationType,
+  method?: "dolly" | "crane" | "pump" | null,
+) {
   const info = getOperation(op ?? "earthmoving");
+  let loader = info.loaderLabel;
+  let hauler = info.haulerLabel;
+  if ((op ?? "earthmoving") === "concreting") {
+    hauler = "Truck mixer";
+    const m = method ?? undefined;
+    if (m === "dolly") loader = "Concrete buggy";
+    else if (m === "crane") loader = "Crane bucket";
+    else if (m === "pump") loader = "Concrete pump";
+    else loader = "Unit place";
+  }
   return {
-    loader: info.loaderLabel,
-    hauler: info.haulerLabel,
+    loader,
+    hauler,
     unit: info.unit,
   };
 }
