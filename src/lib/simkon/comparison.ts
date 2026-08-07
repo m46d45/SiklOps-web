@@ -61,16 +61,74 @@ export type ComparisonGrid = {
 };
 
 /**
- * Kapasitas teoritis (tanpa antrian & tanpa variasi):
+ * Kapasitas teoritis (tanpa antrian & tanpa variasi).
+ *
+ * Earthmoving (single cycle):
  * - Loading: n_L × (60 / t_load) × payload
  * - Hauling: n_H × (60 / t_cycle) × payload, t_cycle = load+haul+dump+return
- * - Sistem: min(loading, hauling)
+ *
+ * Concreting RMC (dual cycle):
+ * - Place:  n_place × (60 / t_place_cycle) × place_cap
+ * - Truck:  n_truck × (60 / t_truck_cycle) × truck_cap
+ * - System: min(place, truck)
  */
 export function theoreticalThroughput(
   base: SimulationConfig,
   numLoaders: number,
   numHaulers: number,
 ): { system: number; loader: number; hauler: number; cycleMin: number } {
+  if (isRmcOperation(base.operation)) {
+    const placeCycle =
+      expectedMean(
+        resolveDist(
+          base,
+          base.place_fill_dist ?? base.load_dist,
+          base.place_fill_mean ?? base.load_time_mean,
+        ),
+      ) +
+      expectedMean(
+        resolveDist(
+          base,
+          base.place_travel_dist ?? base.haul_dist,
+          base.place_travel_mean ?? base.haul_time_mean,
+        ),
+      ) +
+      expectedMean(
+        resolveDist(
+          base,
+          base.place_place_dist ?? base.dump_dist,
+          base.place_place_mean ?? base.dump_time_mean,
+        ),
+      ) +
+      expectedMean(
+        resolveDist(
+          base,
+          base.place_return_dist ?? base.return_dist,
+          base.place_return_mean ?? base.return_time_mean,
+        ),
+      );
+    const truckCycle =
+      Math.max(0.1, base.truck_batch_mean ?? 5) +
+      Math.max(0.1, base.truck_haul_mean ?? 18) +
+      Math.max(0.1, base.truck_discharge_mean ?? 4) +
+      Math.max(0.1, base.truck_return_mean ?? 16);
+    const placeCap = Math.max(
+      0.01,
+      base.place_capacity_m3 ?? base.payload_per_trip ?? 0.5,
+    );
+    const truckCap = Math.max(0.01, base.truck_capacity_m3 ?? 7);
+    const nP = Math.max(1, numLoaders);
+    const nT = Math.max(1, numHaulers);
+    const loader = placeCycle > 0 ? (60 / placeCycle) * nP * placeCap : 0;
+    const hauler = truckCycle > 0 ? (60 / truckCycle) * nT * truckCap : 0;
+    return {
+      system: Math.min(loader, hauler),
+      loader,
+      hauler,
+      cycleMin: placeCycle,
+    };
+  }
+
   const payload = Math.max(0.01, base.hauler_capacity_m3 ?? base.payload_per_trip ?? 1);
   const loadMean = expectedMean(
     resolveDist(base, base.load_dist, base.load_time_mean),

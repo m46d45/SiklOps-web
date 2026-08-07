@@ -3,6 +3,7 @@
  */
 
 import { expectedMean, resolveDist, resourceLabels, type SimulationResult } from "./engine";
+import { isRmcOperation } from "./rmcEngine";
 
 function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
@@ -275,6 +276,26 @@ export function whatIfTips(result: SimulationResult): string[] {
 
 export function theoreticalCaps(result: SimulationResult) {
   const cfg = result.config;
+  if (isRmcOperation(cfg.operation)) {
+    const placeCycle =
+      (cfg.place_fill_mean ?? cfg.load_time_mean) +
+      (cfg.place_travel_mean ?? cfg.haul_time_mean) +
+      (cfg.place_place_mean ?? cfg.dump_time_mean) +
+      (cfg.place_return_mean ?? cfg.return_time_mean);
+    const truckCycle =
+      (cfg.truck_batch_mean ?? 5) +
+      (cfg.truck_haul_mean ?? 18) +
+      (cfg.truck_discharge_mean ?? 4) +
+      (cfg.truck_return_mean ?? 16);
+    const placeCap = Math.max(0.01, cfg.place_capacity_m3 ?? cfg.payload_per_trip ?? 0.5);
+    const truckCap = Math.max(0.01, cfg.truck_capacity_m3 ?? 7);
+    const nP = Math.max(1, cfg.num_place ?? cfg.num_loaders);
+    const nT = Math.max(1, cfg.num_trucks ?? cfg.num_haulers);
+    const loaderProd = placeCycle > 0 ? (60 / placeCycle) * nP * placeCap : 0;
+    const haulerProd = truckCycle > 0 ? (60 / truckCycle) * nT * truckCap : 0;
+    const match = loaderProd > 0 ? haulerProd / loaderProd : 0;
+    return { loaderProd, haulerProd, match, cycle: placeCycle };
+  }
   const cycle = cycleTimeFromConfig(cfg);
   const loaderProd =
     cfg.load_time_mean > 0

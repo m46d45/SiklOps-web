@@ -129,13 +129,27 @@ export function ComparisonPanel({ baseConfig }: Props) {
             </li>
           </ol>
           <p className="pt-1 text-xs">
-            Teori loading: n<sub>L</sub> × (60 / t<sub>load</sub>) × payload. Teori
-            hauling: n<sub>H</sub> × (60 / t<sub>cycle</sub>) × payload (cycle =
-            load+haul+dump+return, tanpa tunggu). Cycle mean setup ≈{" "}
-            <span className="font-mono tabular-nums">
-              {formatNum(grid.cycleMeanMin, 1)}
-            </span>{" "}
-            mnt.
+            {baseConfig.operation === "concreting" ? (
+              <>
+                Teori dual-cycle: place = n<sub>P</sub> × (60 / t<sub>place</sub>) ×
+                place_cap; truck = n<sub>T</sub> × (60 / t<sub>truck</sub>) × drum_cap;
+                sistem = min(place, truck). Place cycle mean ≈{" "}
+                <span className="font-mono tabular-nums">
+                  {formatNum(grid.cycleMeanMin, 1)}
+                </span>{" "}
+                mnt.
+              </>
+            ) : (
+              <>
+                Teori loading: n<sub>L</sub> × (60 / t<sub>load</sub>) × payload. Teori
+                hauling: n<sub>H</sub> × (60 / t<sub>cycle</sub>) × payload (cycle =
+                load+haul+dump+return, tanpa tunggu). Cycle mean setup ≈{" "}
+                <span className="font-mono tabular-nums">
+                  {formatNum(grid.cycleMeanMin, 1)}
+                </span>{" "}
+                mnt.
+              </>
+            )}
           </p>
         </CardContent>
       </Card>
