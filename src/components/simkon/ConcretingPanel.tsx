@@ -223,6 +223,14 @@ export function ConcretingPanel() {
   /** Sewa truck mixer shared (Rp/jam) */
   const [truckCost, setTruckCost] = useState(METHOD_PROFILES.dolly.cost_truck_per_hour);
   const [truckOpCost, setTruckOpCost] = useState(METHOD_PROFILES.dolly.cost_truck_op);
+  const [placeCap, setPlaceCap] = useState<Record<PlacementMethod, number>>({
+    dolly: METHOD_PROFILES.dolly.place_capacity_m3,
+    crane: METHOD_PROFILES.crane.place_capacity_m3,
+    pump: METHOD_PROFILES.pump.place_capacity_m3,
+  });
+  const [pumpRate, setPumpRate] = useState(
+    METHOD_PROFILES.pump.pump_rate_m3_per_h ?? 30,
+  );
   const initP = initPlaceState(DEFAULT_SITE.distance_m, DEFAULT_SITE.height_m, DEFAULT_SITE.cv, DEFAULT_SITE.default_dist_kind);
   const [placeMeans, setPlaceMeans] = useState(initP.means);
   const [placeDists, setPlaceDists] = useState(initP.dists);
@@ -280,6 +288,7 @@ export function ConcretingPanel() {
     cost_hauler_per_hour: truckCost,
     cost_hauler_operator_per_hour: truckOpCost,
     cost_all_in: true,
+    place_capacity_m3: placeCap[m],
   });
   const runCompare = () => {
     setRunning(true);
@@ -349,6 +358,12 @@ export function ConcretingPanel() {
     });
     setTruckCost(METHOD_PROFILES.dolly.cost_truck_per_hour);
     setTruckOpCost(METHOD_PROFILES.dolly.cost_truck_op);
+    setPlaceCap({
+      dolly: METHOD_PROFILES.dolly.place_capacity_m3,
+      crane: METHOD_PROFILES.crane.place_capacity_m3,
+      pump: METHOD_PROFILES.pump.place_capacity_m3,
+    });
+    setPumpRate(METHOD_PROFILES.pump.pump_rate_m3_per_h ?? 30);
     const p = initPlaceState(
       DEFAULT_SITE.distance_m,
       DEFAULT_SITE.height_m,
@@ -767,8 +782,78 @@ export function ConcretingPanel() {
                           }
                         />
                       </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Estimasi biaya/jam armada place:{" "}
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {m === "pump" ? (
+                          <>
+                            <Field
+                              label="Debit teoritis pompa"
+                              unit="m³/jam"
+                              value={pumpRate}
+                              min={5}
+                              max={120}
+                              step={1}
+                              onChange={(v) => setPumpRate(Math.max(5, v))}
+                            />
+                            <Field
+                              label="Volume per pulse cycle"
+                              unit="m³"
+                              value={placeCap[m]}
+                              min={0.1}
+                              max={5}
+                              step={0.05}
+                              onChange={(v) =>
+                                setPlaceCap((c) => ({
+                                  ...c,
+                                  [m]: Math.max(0.1, v),
+                                }))
+                              }
+                            />
+                          </>
+                        ) : (
+                          <Field
+                            label={
+                              m === "crane"
+                                ? "Kapasitas bucket"
+                                : "Kapasitas buggy"
+                            }
+                            unit="m³"
+                            value={placeCap[m]}
+                            min={0.1}
+                            max={m === "crane" ? 3 : 1.5}
+                            step={0.05}
+                            onChange={(v) =>
+                              setPlaceCap((c) => ({
+                                ...c,
+                                [m]: Math.max(0.1, v),
+                              }))
+                            }
+                          />
+                        )}
+                        <Field
+                          label="Kapasitas truck mixer"
+                          unit="m³"
+                          value={site.truck_capacity_m3}
+                          min={3}
+                          max={12}
+                          step={0.5}
+                          onChange={(v) =>
+                            patchSite({ truck_capacity_m3: Math.max(3, v) })
+                          }
+                        />
+                        <Field
+                          label="Kapasitas site buffer"
+                          unit="m³"
+                          value={site.buffer_capacity_m3}
+                          min={1}
+                          max={30}
+                          step={0.5}
+                          onChange={(v) =>
+                            patchSite({ buffer_capacity_m3: Math.max(1, v) })
+                          }
+                        />
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        Estimasi biaya/jam armada:{" "}
                         <strong className="text-foreground">
                           {(
                             (numPlace[m] * (placeCost[m] + placeOpCost[m]) +
@@ -777,8 +862,30 @@ export function ConcretingPanel() {
                           ).toFixed(0)}{" "}
                           ribu Rp/jam
                         </strong>
-                        {" · "}
-                        Kapasitas place {prof.place_capacity_m3} m³/cycle
+                        {m === "pump" ? (
+                          <>
+                            {" · "}Debit teoritis ≈{" "}
+                            <strong className="text-foreground">
+                              {pumpRate} m³/jam
+                            </strong>
+                            {" · "}waktu place ideal per pulse ≈{" "}
+                            <strong className="text-foreground">
+                              {((placeCap[m] / Math.max(pumpRate, 1)) * 60).toFixed(1)}{" "}
+                              mnt
+                            </strong>
+                          </>
+                        ) : (
+                          <>
+                            {" · "}Kapasitas place{" "}
+                            <strong className="text-foreground">
+                              {placeCap[m]} m³/cycle
+                            </strong>
+                          </>
+                        )}
+                      </p>
+                      <p className="text-[10px] leading-relaxed text-muted-foreground/90">
+                        {prof.market_note} Truck mixer default 7 m³, sewa ±Rp 350 rb/jam +
+                        operator ±Rp 100 rb/jam (estimasi pasar Indonesia, bisa diubah).
                       </p>
                     </div>
                     <div className="space-y-2">

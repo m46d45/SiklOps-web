@@ -54,7 +54,7 @@ export const DEFAULT_SITE: SiteScenario = {
   height_m: 6,
   target_volume: 40,
   num_trucks: 3,
-  truck_capacity_m3: 5,
+  truck_capacity_m3: 7,
   truck_batch_mean: 5,
   truck_haul_mean: 18,
   truck_discharge_mean: 4,
@@ -65,7 +65,7 @@ export const DEFAULT_SITE: SiteScenario = {
   truck_return_dist: truckDist(16),
   cv: 0.2,
   default_dist_kind: "normal",
-  buffer_capacity_m3: 6,
+  buffer_capacity_m3: 8,
   seed: 12345,
   target_cycles: 40,
 };
@@ -80,7 +80,11 @@ export type MethodProfile = {
   tasks: string[];
   /** Kapasitas per cycle place (m³) */
   place_capacity_m3: number;
+  /** Debit teoritis pompa (m³/jam) — hanya relevan untuk pump */
+  pump_rate_m3_per_h?: number;
   num_place: number;
+  /** Catatan singkat default pasar ID */
+  market_note: string;
   cost_place_per_hour: number;
   cost_truck_per_hour: number;
   cost_place_op: number;
@@ -102,21 +106,25 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     shortLabel: "Buggy",
     placeLabel: "Concrete buggy",
     description:
-      "Manual concrete buggy from truck-mixer discharge to pour point. Best for short distance and low height.",
+      "Power/hand concrete buggy from truck-mixer discharge to pour point. Best for short distance and low height.",
     tasks: ["Fill buggy", "Travel", "Place", "Return empty"],
-    place_capacity_m3: 0.2,
+    // Power buggy ~16 cu ft ≈ 0,45–0,5 m³ (pasar alat Indonesia / setara)
+    place_capacity_m3: 0.5,
     num_place: 4,
-    cost_place_per_hour: 15_000,
-    cost_truck_per_hour: 280_000,
-    cost_place_op: 50_000,
-    cost_truck_op: 80_000,
-    fuel_place_work: 0,
-    fuel_place_idle: 0,
+    // Sewa power buggy kasar ID: ~Rp 50–100 rb/jam; default mid + operator
+    cost_place_per_hour: 75_000,
+    cost_truck_per_hour: 350_000,
+    cost_place_op: 60_000,
+    cost_truck_op: 100_000,
+    fuel_place_work: 1.5,
+    fuel_place_idle: 0.3,
     fuel_truck_work: 10,
     fuel_truck_idle: 2,
     illustration: "/illustrations/rmc-dolly-cycle.jpg",
     fleet_flexible: true,
     max_place_units: 20,
+    market_note:
+      "Default ID: power buggy ~0,5 m³; sewa ±Rp 75 rb/jam + operator ±Rp 60 rb/jam (estimasi edukatif).",
   },
   crane: {
     method: "crane",
@@ -126,12 +134,14 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     description:
       "Bucket diisi di ground, diangkat crane ke ketinggian place. Cocok struktur bertingkat.",
     tasks: ["Fill bucket", "Lift / swing", "Place", "Return bucket"],
+    // Bucket beton crane umum 0,5–1,5 m³; default 1 m³
     place_capacity_m3: 1,
     num_place: 1,
-    cost_place_per_hour: 450_000,
-    cost_truck_per_hour: 280_000,
-    cost_place_op: 120_000,
-    cost_truck_op: 80_000,
+    // TC sewa bulanan ~Rp 80–100 jt / ~200 jam kerja ≈ Rp 400–500 rb/jam + op
+    cost_place_per_hour: 500_000,
+    cost_truck_per_hour: 350_000,
+    cost_place_op: 150_000,
+    cost_truck_op: 100_000,
     fuel_place_work: 12,
     fuel_place_idle: 4,
     fuel_truck_work: 10,
@@ -139,6 +149,8 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     illustration: "/illustrations/rmc-crane-cycle.jpg",
     fleet_flexible: false,
     max_place_units: 1,
+    market_note:
+      "Default ID: bucket 1 m³; alokasi sewa TC ±Rp 500 rb/jam + operator/rigger ±Rp 150 rb/jam (estimasi dari sewa bulanan).",
   },
   pump: {
     method: "pump",
@@ -146,14 +158,17 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     shortLabel: "Pump",
     placeLabel: "Concrete pump",
     description:
-      "Pompa boom/line dari hopper (isi truck) ke titik cor. Cocok jarak/tinggi besar, volume kontinu.",
+      "Pompa mobile/line dari hopper (isi truck) ke titik cor. Cocok jarak/tinggi besar, volume kontinu.",
     tasks: ["Charge hopper", "Pump (line)", "Place", "Reset hose tip"],
-    place_capacity_m3: 0.5,
+    // Volume per pulse cycle DES; debit teoritis terpisah
+    place_capacity_m3: 0.75,
+    pump_rate_m3_per_h: 30,
     num_place: 1,
-    cost_place_per_hour: 550_000,
-    cost_truck_per_hour: 280_000,
+    // Mini/mobile pump ~Rp 3,5–4 jt / 8 jam → ±Rp 450 rb/jam
+    cost_place_per_hour: 450_000,
+    cost_truck_per_hour: 350_000,
     cost_place_op: 120_000,
-    cost_truck_op: 80_000,
+    cost_truck_op: 100_000,
     fuel_place_work: 18,
     fuel_place_idle: 5,
     fuel_truck_work: 10,
@@ -161,6 +176,8 @@ export const METHOD_PROFILES: Record<PlacementMethod, MethodProfile> = {
     illustration: "/illustrations/rmc-pump-cycle.jpg",
     fleet_flexible: true,
     max_place_units: 4,
+    market_note:
+      "Default ID: mobile/line pump debit teoritis ±30 m³/jam; sewa ±Rp 450 rb/jam (setara ~Rp 3,6 jt/shift 8 jam) + crew.",
   },
 };
 
@@ -341,7 +358,8 @@ export function buildConcretingConfig(
       num_trucks: site.num_trucks,
       num_place: numPlace,
       truck_capacity_m3: site.truck_capacity_m3,
-      place_capacity_m3: profile.place_capacity_m3,
+      place_capacity_m3:
+        overrides?.place_capacity_m3 ?? profile.place_capacity_m3,
       buffer_capacity_m3: site.buffer_capacity_m3,
       truck_batch_mean: site.truck_batch_mean,
       truck_haul_mean: site.truck_haul_mean,
