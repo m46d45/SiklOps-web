@@ -1,0 +1,791 @@
+import { useState } from "react";
+import { Play, RotateCcw } from "lucide-react";
+import {
+  DEFAULT_SITE,
+  METHOD_PROFILES,
+  PLACE_METHODS,
+  buildConcretingConfig,
+  compareAllMethods,
+  derivePlaceCycle,
+  type MethodCompareRow,
+  type SiteScenario,
+} from "@/lib/simkon/concretingScenario";
+import type { PlacementMethod } from "@/lib/simkon/rmcEngine";
+import {
+  DIST_LABELS,
+  fromMeanCv,
+  makeDist,
+  runSimulation,
+  type DistKind,
+  type DurationDist,
+  type SimulationResult,
+} from "@/lib/simkon/engine";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ResultsPanel } from "@/components/simkon/ResultsPanel";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { cn, formatNum } from "@/lib/utils";
+
+function Field({
+  label,
+  unit,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+}: {
+  label: string;
+  unit?: string;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground">
+        {label}
+        {unit ? <span className="ml-1 opacity-70">({unit})</span> : null}
+      </Label>
+      <Input
+        type="number"
+        value={Number.isFinite(value) ? value : 0}
+        min={min}
+        max={max}
+        step={step ?? 1}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-9"
+      />
+    </div>
+  );
+}
+
+const DIST_KEYS = Object.keys(DIST_LABELS) as DistKind[];
+
+type TruckPhase = {
+  key: "batch" | "haul" | "discharge" | "return";
+  label: string;
+  meanKey: keyof SiteScenario;
+  distKey: "truck_batch_dist" | "truck_haul_dist" | "truck_discharge_dist" | "truck_return_dist";
+  maxMean: number;
+};
+
+const TRUCK_PHASES: TruckPhase[] = [
+  { key: "batch", label: "Batch (plant)", meanKey: "truck_batch_mean", distKey: "truck_batch_dist", maxMean: 30 },
+  { key: "haul", label: "Haul to site", meanKey: "truck_haul_mean", distKey: "truck_haul_dist", maxMean: 120 },
+  { key: "discharge", label: "Discharge to buffer", meanKey: "truck_discharge_mean", distKey: "truck_discharge_dist", maxMean: 30 },
+  { key: "return", label: "Return to plant", meanKey: "truck_return_mean", distKey: "truck_return_dist", maxMean: 120 },
+];
+
+function rebuildDist(base: DurationDist, kind: DistKind, cv: number): DurationDist {
+  if (kind === "constant") return makeDist({ kind: "constant", mean: base.mean, cv: 0 });
+  if (kind === "beta") {
+    const spread = 0.4;
+    return makeDist({
+      kind: "beta",
+      mean: base.mean,
+      cv,
+      min_bound:
+        base.min_bound > 0 ? base.min_bound : Math.max(0.05, base.mean * (1 - spread)),
+      max_bound:
+        base.max_bound > base.min_bound
+          ? base.max_bound
+          : Math.max(0.15, base.mean * (1 + spread)),
+      alpha: base.alpha > 0 ? base.alpha : 2,
+      beta_shape: base.beta_shape > 0 ? base.beta_shape : 5,
+    });
+  }
+  return fromMeanCv(base.mean, cv, kind);
+}
+
+
+function suitBadge(s: string) {
+  if (s === "baik") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+  if (s === "buruk") return "bg-red-500/15 text-red-700 dark:text-red-300";
+  return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
+}
+
+export function ConcretingPanel() {
+  const [site, setSite] = useState<SiteScenario>({ ...DEFAULT_SITE });
+  const [method, setMethod] = useState<PlacementMethod>("dolly");
+  const [numPlace, setNumPlace] = useState<Record<PlacementMethod, number>>({
+    dolly: METHOD_PROFILES.dolly.num_place,
+    crane: METHOD_PROFILES.crane.num_place,
+    pump: METHOD_PROFILES.pump.num_place,
+  });
+  const [results, setResults] = useState<
+    Partial<Record<PlacementMethod, SimulationResult>>
+  >({});
+  const [compare, setCompare] = useState<MethodCompareRow[] | null>(null);
+  const [running, setRunning] = useState(false);
+  const [tab, setTab] = useState<string>("dolly");
+
+  const patchSite = (p: Partial<SiteScenario>) =>
+    setSite((s) => ({ ...s, ...p }));
+
+  const onTab = (v: string) => {
+    setTab(v);
+    if (v === "dolly" || v === "crane" || v === "pump") setMethod(v);
+  };
+
+  const runCompare = () => {
+    setRunning(true);
+    requestAnimationFrame(() => {
+      try {
+        const rows = compareAllMethods(site).map((row) => {
+          // honor per-method fleet overrides
+          if (numPlace[row.method] !== METHOD_PROFILES[row.method].num_place) {
+            const r = runSimulation(
+              buildConcretingConfig(site, row.method, {
+                num_place: numPlace[row.method],
+              }),
+            );
+            const hours = r.simulated_minutes / 60;
+            const vol = Math.max(r.total_volume, 1e-9);
+            const p = METHOD_PROFILES[row.method];
+            const totalCost =
+              hours * numPlace[row.method] * (p.cost_place_per_hour + p.cost_place_op) +
+              hours * site.num_trucks * (p.cost_truck_per_hour + p.cost_truck_op);
+            return { ...row, result: r, hours, unit_cost: totalCost / vol };
+          }
+          return row;
+        });
+        setCompare(rows);
+        const next: Partial<Record<PlacementMethod, SimulationResult>> = {};
+        for (const row of rows) next[row.method] = row.result;
+        setResults(next);
+      } finally {
+        setRunning(false);
+      }
+    });
+  };
+
+  const resetSite = () => {
+    setSite({ ...DEFAULT_SITE });
+    setNumPlace({
+      dolly: METHOD_PROFILES.dolly.num_place,
+      crane: METHOD_PROFILES.crane.num_place,
+      pump: METHOD_PROFILES.pump.num_place,
+    });
+    setResults({});
+    setCompare(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Skenario site bersama */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Site scenario (shared)</CardTitle>
+          <CardDescription>
+            Reference point: truck-mixer discharge → pour location. Same distance & height for
+            all three placing methods so comparison is fair.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field
+              label="Jarak horizontal"
+              unit="m"
+              value={site.distance_m}
+              min={0}
+              max={200}
+              step={1}
+              onChange={(v) => patchSite({ distance_m: v })}
+            />
+            <Field
+              label="Tinggi vertikal"
+              unit="m"
+              value={site.height_m}
+              min={0}
+              max={100}
+              step={0.5}
+              onChange={(v) => patchSite({ height_m: v })}
+            />
+            <Field
+              label="Target volume"
+              unit="m³"
+              value={site.target_volume}
+              min={1}
+              max={500}
+              step={1}
+              onChange={(v) => patchSite({ target_volume: v })}
+            />
+            <Field
+              label="Target siklus (cap)"
+              value={site.target_cycles}
+              min={1}
+              max={500}
+              step={1}
+              onChange={(v) => patchSite({ target_cycles: Math.floor(v) })}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field
+              label="Jumlah truck mixer"
+              value={site.num_trucks}
+              min={1}
+              max={20}
+              step={1}
+              onChange={(v) => patchSite({ num_trucks: Math.floor(v) })}
+            />
+            <Field
+              label="Kapasitas drum"
+              unit="m³"
+              value={site.truck_capacity_m3}
+              min={1}
+              max={12}
+              step={0.5}
+              onChange={(v) => patchSite({ truck_capacity_m3: v })}
+            />
+            <Field
+              label="Seed"
+              value={site.seed}
+              min={1}
+              step={1}
+              onChange={(v) => patchSite({ seed: Math.floor(v) })}
+            />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Default dist / CV</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={site.default_dist_kind}
+                  onValueChange={(v) => {
+                    const kind = v as DistKind;
+                    const cv = kind === "constant" ? 0 : site.cv || 0.2;
+                    const patch: Partial<SiteScenario> = {
+                      default_dist_kind: kind,
+                      cv,
+                    };
+                    for (const ph of TRUCK_PHASES) {
+                      const mean = site[ph.meanKey] as number;
+                      patch[ph.distKey] = rebuildDist(
+                        { ...site[ph.distKey], mean },
+                        kind,
+                        cv,
+                      );
+                    }
+                    patchSite(patch);
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIST_KEYS.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {DIST_LABELS[k]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Site buffer resource */}
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,140px)_1fr] sm:items-end">
+            <figure className="overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+              <img
+                src="/illustrations/resources/site-buffer.jpg"
+                alt="Site buffer"
+                className="mx-auto h-28 w-full object-contain p-1"
+              />
+              <figcaption className="border-t border-border px-1.5 py-1 text-center text-[10px] font-medium text-muted-foreground">
+                Site buffer
+              </figcaption>
+            </figure>
+            <Field
+              label="Buffer capacity"
+              unit="m³"
+              value={site.buffer_capacity_m3}
+              min={0.5}
+              max={40}
+              step={0.5}
+              onChange={(v) => patchSite({ buffer_capacity_m3: v })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm font-medium">Cycle A · truck mixer (shared)</p>
+              <p className="text-xs text-muted-foreground">
+                Batch · Haul · Discharge · Return — mean (menit) + distribusi, pola sama seperti
+                earthmoving.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {TRUCK_PHASES.map((ph) => {
+                const mean = site[ph.meanKey] as number;
+                const dist = site[ph.distKey];
+                return (
+                  <div
+                    key={ph.key}
+                    className="rounded-[var(--radius-lg)] border border-border bg-card/40 p-3 sm:p-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{ph.label}</p>
+                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                        μ = {mean} mnt
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-[1fr_minmax(140px,180px)] sm:items-end">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Mean (menit)</Label>
+                        <Slider
+                          min={0.5}
+                          max={ph.maxMean}
+                          step={0.5}
+                          value={[mean]}
+                          onValueChange={([v]) => {
+                            const d = rebuildDist({ ...dist, mean: v }, dist.kind, dist.cv);
+                            patchSite({
+                              [ph.meanKey]: v,
+                              [ph.distKey]: d,
+                            } as Partial<SiteScenario>);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Distribusi</Label>
+                        <Select
+                          value={dist.kind}
+                          onValueChange={(v) => {
+                            const kind = v as DistKind;
+                            const cv = kind === "constant" ? 0 : dist.cv > 0 ? dist.cv : site.cv;
+                            patchSite({
+                              [ph.distKey]: rebuildDist({ ...dist, mean }, kind, cv),
+                            } as Partial<SiteScenario>);
+                          }}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DIST_KEYS.map((k) => (
+                              <SelectItem key={k} value={k}>
+                                {DIST_LABELS[k]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {dist.kind !== "constant" && dist.kind !== "beta" ? (
+                      <div className="mt-3 space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">
+                          CV (std/mean) = {dist.cv.toFixed(2)}
+                        </Label>
+                        <Slider
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={[dist.cv]}
+                          onValueChange={([v]) =>
+                            patchSite({
+                              [ph.distKey]: rebuildDist({ ...dist, mean }, dist.kind, v),
+                            } as Partial<SiteScenario>)
+                          }
+                        />
+                      </div>
+                    ) : null}
+                    {dist.kind === "beta" ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <Field
+                          label="Min"
+                          unit="mnt"
+                          value={dist.min_bound}
+                          min={0.05}
+                          step={0.1}
+                          onChange={(v) =>
+                            patchSite({
+                              [ph.distKey]: { ...dist, min_bound: v },
+                            } as Partial<SiteScenario>)
+                          }
+                        />
+                        <Field
+                          label="Max"
+                          unit="mnt"
+                          value={dist.max_bound}
+                          min={0.1}
+                          step={0.1}
+                          onChange={(v) =>
+                            patchSite({
+                              [ph.distKey]: { ...dist, max_bound: v },
+                            } as Partial<SiteScenario>)
+                          }
+                        />
+                        <Field
+                          label="α"
+                          value={dist.alpha}
+                          min={0.1}
+                          step={0.1}
+                          onChange={(v) =>
+                            patchSite({
+                              [ph.distKey]: { ...dist, alpha: v },
+                            } as Partial<SiteScenario>)
+                          }
+                        />
+                        <Field
+                          label="β"
+                          value={dist.beta_shape}
+                          min={0.1}
+                          step={0.1}
+                          onChange={(v) =>
+                            patchSite({
+                              [ph.distKey]: { ...dist, beta_shape: v },
+                            } as Partial<SiteScenario>)
+                          }
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={resetSite}>
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              Reset skenario
+            </Button>
+            <Button type="button" size="sm" onClick={runCompare} disabled={running}>
+              <Play className="mr-1.5 h-3.5 w-3.5" />
+              Jalankan & bandingkan 3 metode
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabs metode + perbandingan */}
+      <Tabs value={tab} onValueChange={onTab}>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+          {PLACE_METHODS.map((m) => (
+            <TabsTrigger key={m} value={m} className="text-xs sm:text-sm">
+              {METHOD_PROFILES[m].shortLabel}
+            </TabsTrigger>
+          ))}
+          <TabsTrigger value="compare" className="text-xs sm:text-sm">
+            Perbandingan
+          </TabsTrigger>
+        </TabsList>
+
+        {PLACE_METHODS.map((m) => {
+          const d = derivePlaceCycle(m, site.distance_m, site.height_m);
+          const prof = METHOD_PROFILES[m];
+          const res = results[m];
+          return (
+            <TabsContent key={m} value={m} className="space-y-4 pt-2">
+              <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,280px)]">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="text-base">{prof.label}</CardTitle>
+                      <Badge
+                        variant="outline"
+                        className={cn("capitalize", suitBadge(d.suitability))}
+                      >
+                        Cocok: {d.suitability}
+                      </Badge>
+                    </div>
+                    <CardDescription>{prof.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Tasks · placing cycle
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {prof.tasks.map((task, i) => (
+                          <Badge key={task} variant="outline" className="font-normal">
+                            {i + 1}. {task}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {d.note}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <Field
+                        label={`Jumlah ${prof.placeLabel.toLowerCase()}`}
+                        value={numPlace[m]}
+                        min={1}
+                        max={20}
+                        step={1}
+                        onChange={(v) =>
+                          setNumPlace((p) => ({ ...p, [m]: Math.floor(v) }))
+                        }
+                      />
+                      <div className="rounded-md border border-border bg-muted/40 p-3 text-xs sm:col-span-2">
+                        <p className="font-medium text-foreground">
+                          Cycle place (diturunkan dari jarak {site.distance_m} m · tinggi{" "}
+                          {site.height_m} m)
+                        </p>
+                        <ul className="mt-2 grid grid-cols-2 gap-1 text-muted-foreground sm:grid-cols-5">
+                          <li>Fill: {d.fill_mean} mnt</li>
+                          <li>Travel: {d.travel_mean} mnt</li>
+                          <li>Place: {d.place_mean} mnt</li>
+                          <li>Return: {d.return_mean} mnt</li>
+                          <li className="font-medium text-foreground">
+                            Σ {d.cycle_mean} mnt
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setMethod(m);
+                          setRunning(true);
+                          requestAnimationFrame(() => {
+                            try {
+                              const r = runSimulation(
+                                buildConcretingConfig(site, m, {
+                                  num_place: numPlace[m],
+                                }),
+                              );
+                              setResults((prev) => ({ ...prev, [m]: r }));
+                            } finally {
+                              setRunning(false);
+                            }
+                          });
+                        }}
+                        disabled={running}
+                      >
+                        <Play className="mr-1.5 h-4 w-4" />
+                        Jalankan simulasi {prof.shortLabel}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/30">
+                  <img
+                    src={prof.illustration}
+                    alt={prof.label}
+                    className="mx-auto max-h-48 w-full object-contain object-center p-2 sm:max-h-56"
+                  />
+                </figure>
+              </div>
+
+              <div id={m === method ? "hasil-concreting" : undefined}>
+                {res ? (
+                  <ResultsPanel result={res} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Belum ada hasil — jalankan simulasi metode ini, atau pakai tombol
+                    bandingkan 3 metode di skenario.
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+          );
+        })}
+
+        <TabsContent value="compare" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Perbandingan metode placing</CardTitle>
+              <CardDescription>
+                Skenario sama: jarak {site.distance_m} m · tinggi {site.height_m} m · target{" "}
+                {site.target_volume} m³ · {site.num_trucks} truck mixer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button type="button" onClick={runCompare} disabled={running}>
+                <Play className="mr-1.5 h-4 w-4" />
+                {running ? "Menghitung…" : "Hitung ulang perbandingan"}
+              </Button>
+
+              {compare ? (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-xs text-muted-foreground">
+                          <th className="py-2 pr-3 font-medium">Metode</th>
+                          <th className="py-2 pr-3 font-medium">Cocok</th>
+                          <th className="py-2 pr-3 font-medium">Cycle place</th>
+                          <th className="py-2 pr-3 font-medium">Throughput</th>
+                          <th className="py-2 pr-3 font-medium">Durasi</th>
+                          <th className="py-2 pr-3 font-medium">Util place</th>
+                          <th className="py-2 pr-3 font-medium">Util truck</th>
+                          <th className="py-2 pr-3 font-medium">Biaya/m³</th>
+                          <th className="py-2 font-medium">Emisi/m³</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {compare.map((row) => (
+                          <tr key={row.method} className="border-b border-border/60">
+                            <td className="py-2 pr-3 font-medium">{row.label}</td>
+                            <td className="py-2 pr-3">
+                              <span
+                                className={cn(
+                                  "rounded px-1.5 py-0.5 text-xs capitalize",
+                                  suitBadge(row.suitability),
+                                )}
+                              >
+                                {row.suitability}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-3">{formatNum(row.cycle_place_mean, 1)} mnt</td>
+                            <td className="py-2 pr-3">
+                              {formatNum(row.result.throughput_per_hour, 1)} m³/jam
+                            </td>
+                            <td className="py-2 pr-3">{formatNum(row.hours, 2)} jam</td>
+                            <td className="py-2 pr-3">
+                              {formatNum(row.result.loader_utilization * 100, 0)}%
+                            </td>
+                            <td className="py-2 pr-3">
+                              {formatNum(row.result.hauler_utilization * 100, 0)}%
+                            </td>
+                            <td className="py-2 pr-3">
+                              {formatNum(row.unit_cost / 1000, 0)} rb
+                            </td>
+                            <td className="py-2">
+                              {formatNum(row.unit_emission, 2)} kg
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <ChartCard title="Throughput (m³/jam)">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart
+                          data={compare.map((r) => ({
+                            name: METHOD_PROFILES[r.method].shortLabel,
+                            v: r.result.throughput_per_hour,
+                          }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Bar dataKey="v" name="m³/jam" fill="var(--color-chart-1)" radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                    <ChartCard title="Biaya satuan (ribu Rp/m³)">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart
+                          data={compare.map((r) => ({
+                            name: METHOD_PROFILES[r.method].shortLabel,
+                            v: r.unit_cost / 1000,
+                          }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Bar dataKey="v" name="rb Rp/m³" fill="var(--color-chart-2)" radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                    <ChartCard title="Utilisasi resource (%)">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart
+                          data={compare.map((r) => ({
+                            name: METHOD_PROFILES[r.method].shortLabel,
+                            place: r.result.loader_utilization * 100,
+                            truck: r.result.hauler_utilization * 100,
+                          }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="place" name="Place" fill="var(--color-chart-1)" radius={4} />
+                          <Bar dataKey="truck" name="Truck" fill="var(--color-chart-3)" radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                    <ChartCard title="Emisi satuan (kg CO₂e/m³)">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart
+                          data={compare.map((r) => ({
+                            name: METHOD_PROFILES[r.method].shortLabel,
+                            v: r.unit_emission,
+                          }))}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip />
+                          <Bar dataKey="v" name="kg/m³" fill="var(--color-chart-4)" radius={4} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  </div>
+
+                  <ul className="space-y-2 text-xs text-muted-foreground">
+                    {compare.map((r) => (
+                      <li key={r.method}>
+                        <strong className="text-foreground">
+                          {METHOD_PROFILES[r.method].shortLabel}:
+                        </strong>{" "}
+                        {r.note}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Belum ada data perbandingan. Klik hitung ulang atau tombol di skenario.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-border p-3">
+      <p className="mb-2 text-xs font-medium text-muted-foreground">{title}</p>
+      {children}
+    </div>
+  );
+}

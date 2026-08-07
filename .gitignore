@@ -1,0 +1,17 @@
+node_modules
+dist
+.output
+.vercel
+.nitro
+.vinxi
+.tanstack
+.env
+.env.*
+!.env.example
+*.log
+screenshots
+artifacts
+.DS_Store
+coverage
+playwright-report
+test-results
