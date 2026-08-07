@@ -7,7 +7,9 @@ export type OperationId =
   | "earthmoving"
   | "bricklaying"
   | "concreting"
-  | "tower_crane";
+  | "tower_crane"
+  | "asphalt_paving"
+  | "precast_plant";
 
 /** Alias lama skenario tersimpan (RMC 3-op → concreting) */
 const LEGACY_OP: Record<string, OperationId> = {
@@ -302,6 +304,122 @@ export const OPERATIONS: OperationInfo[] = [
     illustration: "/illustrations/tower-crane-multi-front.jpg",
     illustrationCaption:
       "MATERIAL YARD (kiri, terpisah) → Tower crane (single server) → Front A/B/C di bangunan (lokasi berbeda). Prioritas 1 = tertinggi.",
+  },
+  {
+    id: "asphalt_paving",
+    title: "Asphalt paving (paving train)",
+    shortTitle: "Asphalt paving",
+    description:
+      "Paving train linear: asphalt plant mengisi dump truck → haul ke site → dump ke hopper paver → spread → breakdown roller → finish roller. Produksi dihitung saat paver selesai spread (m³ hot mix).",
+    sidebarBlurb: "Paving train · plant + truck + paver + roller",
+    tasks: [
+      { key: "load", label: "Plant load" },
+      { key: "haul", label: "Haul" },
+      { key: "dump", label: "Dump hopper" },
+      { key: "return", label: "Return" },
+    ],
+    taskLabels: ["Plant load", "Haul", "Dump", "Return"],
+    loaderLabel: "Paver",
+    haulerLabel: "Dump truck",
+    loaderCapacityLabel: "Kapasitas spread / load",
+    haulerCapacityLabel: "Kapasitas bak",
+    unit: "m³",
+    durationUnit: "menit",
+    sinceVersion: "1.3",
+    available: true,
+    defaults: {
+      num_loaders: 1,
+      num_haulers: 6,
+      loader_bucket: 8,
+      hauler_capacity: 8,
+      load: 4,
+      haul: 12,
+      dump: 1.5,
+      return: 11,
+      target_cycles: 80,
+      target_volume: 400,
+      cost_loader: 1_200_000,
+      cost_hauler: 350_000,
+      cost_loader_operator: 150_000,
+      cost_hauler_operator: 90_000,
+      fuel_loader_work: 18,
+      fuel_loader_idle: 5,
+      fuel_hauler_work: 12,
+      fuel_hauler_idle: 2.5,
+    },
+    manual: {
+      summary:
+        "Level linear train — plant, truck, paver (hopper), breakdown & finish roller. Mirip Halpin Ch.11 asphalt paving.",
+      howTo: [
+        "Set n truck, paver, roller, plant bay, hopper capacity, payload m³.",
+        "Isi mean+dist: plant load, haul, dump, return, spread, breakdown, finish.",
+        "Set spreads per breakdown section; target siklus/volume; jalankan.",
+        "Baca bottleneck (plant / truck / paver / roller) dan thr vs teori.",
+      ],
+      notes:
+        "Produksi m³ = spread selesai. Roller mengikuti section; antrian hopper jika paver lambat.",
+    },
+    illustration: "/illustrations/asphalt-paving-cycle.jpg",
+    illustrationCaption:
+      "Plant → truck haul → paver hopper → spread → breakdown → finish. Linear paving train.",
+  },
+  {
+    id: "precast_plant",
+    title: "Precast plant (fabrikasi)",
+    shortTitle: "Precast plant",
+    description:
+      "Pabrik precast: form cycle prepare → pour (crew+crane) → cure (slot terbatas) → strip (crew+crane) → clean. Bottleneck klasik: crane, cure slots, crew, atau jumlah form.",
+    sidebarBlurb: "Form cycle · crew + crane + cure slots",
+    tasks: [
+      { key: "load", label: "Prepare" },
+      { key: "haul", label: "Pour" },
+      { key: "dump", label: "Cure" },
+      { key: "return", label: "Strip + clean" },
+    ],
+    taskLabels: ["Prepare", "Pour", "Cure", "Strip+clean"],
+    loaderLabel: "Crew",
+    haulerLabel: "Form",
+    loaderCapacityLabel: "Volume elemen",
+    haulerCapacityLabel: "Volume elemen",
+    unit: "m³",
+    durationUnit: "menit",
+    sinceVersion: "1.3",
+    available: true,
+    defaults: {
+      num_loaders: 2,
+      num_haulers: 6,
+      loader_bucket: 2.5,
+      hauler_capacity: 2.5,
+      load: 45,
+      haul: 25,
+      dump: 720,
+      return: 35,
+      target_cycles: 20,
+      target_volume: 50,
+      cost_loader: 180_000,
+      cost_hauler: 25_000,
+      cost_loader_operator: 0,
+      cost_hauler_operator: 0,
+      fuel_loader_work: 4,
+      fuel_loader_idle: 1.5,
+      fuel_hauler_work: 0,
+      fuel_hauler_idle: 0,
+    },
+    manual: {
+      summary:
+        "Level plant — form, crew, crane, cure slots. Prioritas strip→pour→clean→prepare. Mirip Halpin Ch.13–14 precast plant.",
+      howTo: [
+        "Set n form, crew, cure slots, crane, volume elemen m³.",
+        "Isi mean+dist prepare / pour / cure / strip / clean.",
+        "Cure default 12 jam — turunkan untuk demo kelas.",
+        "Jalankan; bandingkan util crew, form, crane, cure vs thr teori.",
+      ],
+      notes:
+        "Produksi dihitung saat strip selesai. Cure slots penuh = antrian wait_cure. Crane melayani pour & strip.",
+    },
+    illustration: "/illustrations/precast-plant-cycle.jpg",
+    illustrationCaption:
+      "Form beds → pour with overhead crane → curing slots → strip → stock. Limited cure positions.",
   },
 
 ];

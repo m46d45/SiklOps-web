@@ -101,6 +101,16 @@ function ManualPage() {
                 </a>
               </li>
               <li>
+                <a href="#asphalt" className="text-foreground hover:underline">
+                  Asphalt paving
+                </a>
+              </li>
+              <li>
+                <a href="#precast" className="text-foreground hover:underline">
+                  Precast plant
+                </a>
+              </li>
+              <li>
                 <a href="#tips" className="text-foreground hover:underline">
                   Tips & FAQ
                 </a>
@@ -168,11 +178,23 @@ function ManualPage() {
                   <td className="px-3 py-2">2 siklus berinteraksi</td>
                   <td className="px-3 py-2">RMC ↔ placing, site buffer, 3 metode</td>
                 </tr>
-                <tr>
+                <tr className="border-b border-border/80">
                   <td className="px-3 py-2">4</td>
                   <td className="px-3 py-2 font-medium text-foreground">Tower Crane</td>
                   <td className="px-3 py-2">Banyak request · 1 server</td>
                   <td className="px-3 py-2">Poisson, prioritas, starvation, waste crew</td>
+                </tr>
+                <tr className="border-b border-border/80">
+                  <td className="px-3 py-2">5</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Asphalt paving</td>
+                  <td className="px-3 py-2">Paving train linear</td>
+                  <td className="px-3 py-2">Plant–truck–paver–roller, hopper</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">6</td>
+                  <td className="px-3 py-2 font-medium text-foreground">Precast plant</td>
+                  <td className="px-3 py-2">Form + cure slots</td>
+                  <td className="px-3 py-2">Crew, crane, buffer curing</td>
                 </tr>
               </tbody>
             </table>
@@ -649,6 +671,79 @@ function ManualPage() {
           </Card>
         </section>
 
+
+          {/* ASPHALT */}
+          <Card id="asphalt" className="scroll-mt-20 rounded-[var(--radius-lg)]">
+            <CardHeader className="space-y-1 p-4 pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm">Asphalt paving</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  Level 5 · paving train
+                </Badge>
+              </div>
+              <CardDescription>
+                Plant → truck → paver hopper → spread → breakdown → finish
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
+              <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+                <img
+                  src="/illustrations/asphalt-paving-cycle.jpg"
+                  alt="Asphalt paving"
+                  className="mx-auto max-h-48 w-full object-contain"
+                  loading="lazy"
+                />
+              </figure>
+              <p>
+                <strong className="text-foreground">Model (Halpin Ch.11):</strong> paving train
+                linear. Truk hauling hot mix; paver menyebar; roller compact. Produksi m³ dihitung
+                saat spread selesai.
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs sm:text-sm">
+                <li>Siklus truck: plant load → haul → dump hopper → return</li>
+                <li>Paver: spread 1 muatan; hopper terbatas</li>
+                <li>Setiap N spread → breakdown section → finish roller</li>
+                <li>What-if: n truck × n paver (tab Perbandingan)</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* PRECAST */}
+          <Card id="precast" className="scroll-mt-20 rounded-[var(--radius-lg)]">
+            <CardHeader className="space-y-1 p-4 pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm">Precast plant</CardTitle>
+                <Badge variant="outline" className="font-normal">
+                  Level 6 · form + cure buffer
+                </Badge>
+              </div>
+              <CardDescription>
+                Prepare → pour (crane) → cure slots → strip (crane) → clean
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 pt-0 text-sm text-muted-foreground">
+              <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-md)] border border-border bg-muted/20">
+                <img
+                  src="/illustrations/precast-plant-cycle.jpg"
+                  alt="Precast plant"
+                  className="mx-auto max-h-48 w-full object-contain"
+                  loading="lazy"
+                />
+              </figure>
+              <p>
+                <strong className="text-foreground">Model (Halpin Ch.13–14):</strong> form cycle di
+                pabrik. Slot curing terbatas; crane shared pour+strip. Prioritas dispatch:
+                strip → pour → clean → prepare.
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-xs sm:text-sm">
+                <li>Resource: form, crew, crane, cure slots</li>
+                <li>Produksi dihitung saat strip selesai</li>
+                <li>Cure default 12 jam — turunkan untuk demo kelas</li>
+                <li>Bottleneck tipikal: crane atau cure slots</li>
+              </ul>
+            </CardContent>
+          </Card>
+
         {/* Dynamic catalog extras from OPERATIONS */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-tight">
@@ -741,7 +836,7 @@ function ManualPage() {
         </div>
 
         <p className="pb-6 text-center text-xs text-muted-foreground">
-          SiklOps · Manual lengkap · Earthmoving · Bricklaying · Concreting · Tower Crane
+          SiklOps · Manual lengkap · 6 operasi · DES pembelajaran
         </p>
       </main>
     </div>

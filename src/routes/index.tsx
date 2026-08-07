@@ -31,6 +31,8 @@ import { ResultsPanel } from "@/components/simkon/ResultsPanel";
 import { ConcretingPanel } from "@/components/simkon/ConcretingPanel";
 import { BricklayingPanel } from "@/components/simkon/BricklayingPanel";
 import { TowerCranePanel } from "@/components/simkon/TowerCranePanel";
+import { AsphaltPavingPanel } from "@/components/simkon/AsphaltPavingPanel";
+import { PrecastPlantPanel } from "@/components/simkon/PrecastPlantPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -383,6 +385,10 @@ function SiklOpsApp() {
             <BricklayingPanel />
           ) : operation.id === "tower_crane" ? (
             <TowerCranePanel />
+          ) : operation.id === "asphalt_paving" ? (
+            <AsphaltPavingPanel />
+          ) : operation.id === "precast_plant" ? (
+            <PrecastPlantPanel />
           ) : (
             <>
           <Card className="rounded-[var(--radius-xl)]">

@@ -22,6 +22,16 @@ import {
   isTowerCraneOperation,
   runTowerCraneSimulation,
 } from "./towerCraneEngine";
+import {
+  applyAsphaltToConfig,
+  isAsphaltOperation,
+  runAsphaltSimulation,
+} from "./asphaltEngine";
+import {
+  applyPrecastToConfig,
+  isPrecastOperation,
+  runPrecastSimulation,
+} from "./precastEngine";
 
 export const APP_VERSION = "1.1";
 export const DIESEL_KG_CO2_PER_L = 2.68;
@@ -533,6 +543,12 @@ export function defaultConfig(operation: OperationType = "earthmoving"): Simulat
   if (isTowerCraneOperation(operation)) {
     return applyTowerCraneToConfig(base);
   }
+  if (isAsphaltOperation(operation)) {
+    return applyAsphaltToConfig(base);
+  }
+  if (isPrecastOperation(operation)) {
+    return applyPrecastToConfig(base);
+  }
   return base;
 }
 
@@ -546,6 +562,12 @@ export function runSimulation(configIn: SimulationConfig): SimulationResult {
   }
   if (isTowerCraneOperation(configIn.operation)) {
     return runTowerCraneSimulation(configIn);
+  }
+  if (isAsphaltOperation(configIn.operation)) {
+    return runAsphaltSimulation(configIn);
+  }
+  if (isPrecastOperation(configIn.operation)) {
+    return runPrecastSimulation(configIn);
   }
   const haulerCap = Math.max(0.01, configIn.hauler_capacity_m3 ?? configIn.payload_per_trip ?? 4);
   const op = (configIn.operation || "earthmoving") as OperationType;

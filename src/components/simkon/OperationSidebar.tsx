@@ -2,6 +2,8 @@ import {
   BookOpen,
   BrickWall,
   Cylinder,
+  Factory,
+  Route,
   Shovel,
   type LucideIcon,
 } from "lucide-react";
@@ -60,6 +62,8 @@ const ICONS: Record<OperationId, OpIcon> = {
   bricklaying: BrickWall, // pasangan bata
   concreting: Cylinder, // drum / ready-mix
   tower_crane: TowerCraneIcon,
+  asphalt_paving: Route,
+  precast_plant: Factory,
 };
 
 type Props = {
