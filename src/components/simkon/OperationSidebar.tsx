@@ -48,10 +48,6 @@ export function OperationSidebar({
             </li>
           ))}
         </ul>
-        <p className="mt-6 px-1 text-xs leading-relaxed text-muted-foreground">
-          Template multi-operasi: Earthmoving · Bricklaying · Concreting (3 metode
-          place). Tab hasil standar di tiap operasi.
-        </p>
       </div>
 
       <div className="mt-6 shrink-0 border-t border-border pt-4">
@@ -120,20 +116,11 @@ function OperationItem({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium leading-snug">{op.shortTitle}</span>
-          {op.available ? (
-            active ? (
-              <Badge
-                variant="secondary"
-                className="border-0 bg-primary-foreground/15 text-[10px] text-primary-foreground"
-              >
-                aktif
-              </Badge>
-            ) : null
-          ) : (
+          {!op.available ? (
             <Badge variant="outline" className="text-[10px]">
               {op.comingIn ?? "segera"}
             </Badge>
-          )}
+          ) : null}
         </span>
         <span
           className={cn(
