@@ -291,12 +291,13 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
   const config = applyTowerCraneToConfig(configIn, f);
   const rng = new Rng(config.seed);
 
-  let maxHorizon = config.simulation_duration > 0 ? config.simulation_duration : 7 * 24 * 60;
+  let maxHorizon = config.simulation_duration > 0 ? config.simulation_duration : 8 * 60;
   let targetCycles = Math.max(0, Math.floor(config.target_cycles || 0));
   let targetVolume = Math.max(0, Number(config.target_volume) || 0);
-  if (targetCycles <= 0 && targetVolume <= 0) {
-    targetCycles = 50;
-    targetVolume = 40;
+  // Tower crane default stop: waktu operasi maksimum (bukan volume).
+  // target_cycles/volume only if explicitly > 0.
+  if (targetCycles <= 0 && targetVolume <= 0 && !(config.simulation_duration > 0)) {
+    maxHorizon = 8 * 60;
   }
 
   const fronts = f.fronts.filter((x) => x.enabled);

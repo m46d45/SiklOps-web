@@ -473,7 +473,7 @@ export function defaultConfig(operation: OperationType = "earthmoving"): Simulat
     dump_dist: fromMeanCv(dump, 0.2, "normal"),
     return_dist: fromMeanCv(ret, 0.2, "normal"),
     payload_per_trip: haulerCap,
-    simulation_duration: 7 * 24 * 60,
+    simulation_duration: isTowerCraneOperation(operation) ? 8 * 60 : 7 * 24 * 60,
     target_cycles: d.target_cycles,
     target_volume: d.target_volume,
     stop_mode: "either",

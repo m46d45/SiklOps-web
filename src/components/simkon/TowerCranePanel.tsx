@@ -82,8 +82,8 @@ type ResultExtra = SimulationResult & {
 export function TowerCranePanel() {
   const [fields, setFields] = useState<TowerCraneFields>(towerCraneDefaults());
   const [seed, setSeed] = useState(12345);
-  const [targetVolume, setTargetVolume] = useState(40);
-  const [targetCycles, setTargetCycles] = useState(50);
+  /** Waktu operasi maksimum (jam) — default shift 8 jam */
+  const [maxHours, setMaxHours] = useState(8);
   const [costCrane, setCostCrane] = useState(500_000);
   const [costOp, setCostOp] = useState(150_000);
   const [running, setRunning] = useState(false);
@@ -103,12 +103,14 @@ export function TowerCranePanel() {
     requestAnimationFrame(() => {
       try {
         const base = defaultConfig("tower_crane");
+        const minutes = Math.max(15, maxHours * 60);
         const cfg = applyTowerCraneToConfig(
           {
             ...base,
             seed,
-            target_volume: targetVolume,
-            target_cycles: targetCycles,
+            simulation_duration: minutes,
+            target_volume: 0,
+            target_cycles: 0,
             stop_mode: "either",
             cost_loader_per_hour: costCrane,
             cost_loader_operator_per_hour: costOp,
@@ -126,8 +128,7 @@ export function TowerCranePanel() {
   const reset = () => {
     setFields(towerCraneDefaults());
     setSeed(12345);
-    setTargetVolume(40);
-    setTargetCycles(50);
+    setMaxHours(8);
     setCostCrane(500_000);
     setCostOp(150_000);
     setResult(null);
@@ -139,11 +140,11 @@ export function TowerCranePanel() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Tower crane · multi-front + prioritas</CardTitle>
           <CardDescription className="leading-relaxed">
-            Crane = <strong className="text-foreground">single server</strong>. Setiap front
-            meminta lift material dari yard. Antrian diurut{" "}
-            <strong className="text-foreground">prioritas 1 (tinggi) → 9 (rendah)</strong>, lalu
-            FIFO. Beban melebihi kapasitas angkat ditolak. Lihat util crane dan wait per front —
-            apakah crane bottleneck pekerjaan lain.
+            Crane = <strong className="text-foreground">single server</strong>. Material dari{" "}
+            <strong className="text-foreground">yard</strong> ke front A/B/C. Antrian{" "}
+            <strong className="text-foreground">prioritas 1 → 9</strong>, lalu FIFO. Simulasi
+            berhenti pada <strong className="text-foreground">waktu operasi maksimum</strong>{" "}
+            (default 8 jam) — tanpa target volume.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -208,21 +209,13 @@ export function TowerCranePanel() {
             />
             <Field label="Seed" value={seed} min={1} step={1} onChange={(v) => setSeed(Math.floor(v))} />
             <Field
-              label="Target volume"
-              unit="unit"
-              value={targetVolume}
-              min={1}
-              max={500}
-              step={1}
-              onChange={setTargetVolume}
-            />
-            <Field
-              label="Target lift (siklus)"
-              value={targetCycles}
-              min={1}
-              max={500}
-              step={1}
-              onChange={(v) => setTargetCycles(Math.floor(v))}
+              label="Waktu operasi maks"
+              unit="jam"
+              value={maxHours}
+              min={0.5}
+              max={24}
+              step={0.5}
+              onChange={setMaxHours}
             />
           </div>
 
