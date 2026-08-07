@@ -94,7 +94,7 @@ export function defaultFronts(): CraneFront[] {
     {
       id: 3,
       name: "Front D · MEP",
-      priority: 3,
+      priority: 4,
       volume_per_lift: 0.5,
       request_interval_mean: 15,
       service_mean: 5.4,
@@ -105,7 +105,7 @@ export function defaultFronts(): CraneFront[] {
     {
       id: 4,
       name: "Front E · finishing",
-      priority: 4,
+      priority: 5,
       volume_per_lift: 0.4,
       request_interval_mean: 18,
       service_mean: 4.7,
