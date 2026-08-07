@@ -312,8 +312,8 @@ export function BricklayingPanel() {
   const [seed, setSeed] = useState(12345);
   const [targetVolume, setTargetVolume] = useState(10);
   const [targetCycles, setTargetCycles] = useState(200);
-  const [costMason, setCostMason] = useState(75_000);
-  const [costHelper, setCostHelper] = useState(50_000);
+  const [costMason, setCostMason] = useState(25_000);
+  const [costHelper, setCostHelper] = useState(18_000);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<SimulationResult | null>(null);
 
@@ -363,8 +363,8 @@ export function BricklayingPanel() {
     setSeed(12345);
     setTargetVolume(10);
     setTargetCycles(200);
-    setCostMason(75_000);
-    setCostHelper(50_000);
+    setCostMason(25_000);
+    setCostHelper(18_000);
     setResult(null);
   };
 
@@ -492,7 +492,7 @@ export function BricklayingPanel() {
             </div>
             <p className="text-[11px] text-muted-foreground">
               Max temp {caps.tempMax} bata · Max scaffold {caps.scafMax} bata · Mortar scaffold ≈{" "}
-              {caps.mortarBricks} bata ekuivalen.
+              {caps.mortarBricks} bata ekuivalen. Upah default (2026, mid-ID): tukang ≈ Rp 200 rb/hari · helper ≈ Rp 144 rb/hari (÷8 jam).
             </p>
           </div>
 
