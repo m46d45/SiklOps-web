@@ -5,7 +5,6 @@ import {
   type OperationId,
   type OperationInfo,
 } from "@/lib/simkon/operations";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<OperationId, typeof Truck> = {
@@ -116,11 +115,6 @@ function OperationItem({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-medium leading-snug">{op.shortTitle}</span>
-          {!op.available ? (
-            <Badge variant="outline" className="text-[10px]">
-              {op.comingIn ?? "segera"}
-            </Badge>
-          ) : null}
         </span>
         <span
           className={cn(
@@ -132,7 +126,7 @@ function OperationItem({
         >
           {op.available
             ? `${op.loaderLabel} + ${op.haulerLabel}`
-            : `Rencana ${op.comingIn ?? "versi berikutnya"}`}
+            : "Segera hadir"}
         </span>
       </span>
     </button>

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen } from "lucide-react";
-import { APP_VERSION, DIESEL_KG_CO2_PER_L } from "@/lib/simkon/engine";
+import { DIESEL_KG_CO2_PER_L } from "@/lib/simkon/engine";
 import { OPERATIONS } from "@/lib/simkon/operations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ function ManualPage() {
                 <h1 className="text-base font-semibold tracking-tight sm:text-lg">
                   Manual SiklOps
                 </h1>
-                <Badge variant="secondary">v{APP_VERSION}</Badge>
+                
               </div>
               <p className="truncate text-xs text-muted-foreground">
                 Panduan umum · parameter · hasil · per operasi
@@ -419,14 +419,6 @@ function ManualPage() {
                   <CardHeader className="space-y-1 p-4 pb-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <CardTitle className="text-sm">{op.title}</CardTitle>
-                      <Badge variant={op.available ? "success" : "secondary"}>
-                        sejak v{op.sinceVersion}
-                      </Badge>
-                      {op.available ? (
-                        <Badge variant="outline">aktif</Badge>
-                      ) : (
-                        <Badge variant="secondary">{op.comingIn}</Badge>
-                      )}
                     </div>
                     <CardDescription className="leading-relaxed">
                       {op.description}
@@ -526,7 +518,7 @@ function ManualPage() {
         </div>
 
         <p className="pb-6 text-center text-xs text-muted-foreground">
-          SiklOps v{APP_VERSION} · Manual umum · Pembaruan mengikuti fitur aplikasi
+          SiklOps · Manual umum · Pembaruan mengikuti fitur aplikasi
         </p>
       </main>
     </div>

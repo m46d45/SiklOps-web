@@ -11,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  APP_VERSION,
   cycleTimeMean,
   defaultConfig,
   runSimulation,
@@ -130,7 +129,6 @@ function SiklOpsApp() {
                 <h1 className="truncate text-base font-semibold tracking-tight sm:text-lg">
                   SiklOps
                 </h1>
-                <Badge variant="secondary">v{APP_VERSION}</Badge>
               </div>
               <p className="truncate text-xs text-muted-foreground">
                 Simulasi siklus operasi konstruksi
@@ -254,12 +252,6 @@ function SiklOpsApp() {
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center gap-2">
                 <CardTitle className="text-base">{operation.title}</CardTitle>
-                <Badge variant="outline">v{operation.sinceVersion}</Badge>
-                {operation.available ? (
-                  <Badge variant="success">tersedia</Badge>
-                ) : (
-                  <Badge variant="secondary">{operation.comingIn}</Badge>
-                )}
               </div>
               <CardDescription className="max-w-3xl leading-relaxed">
                 {operation.description}
@@ -430,7 +422,7 @@ function SiklOpsApp() {
           )}
 
           <footer className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
-            SiklOps v{APP_VERSION} · DES · Pembelajaran
+            SiklOps · DES · Pembelajaran
           </footer>
         </main>
       </div>
