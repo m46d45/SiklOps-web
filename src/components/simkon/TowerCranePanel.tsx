@@ -9,12 +9,27 @@ import {
   type TowerCraneFields,
   runTowerCraneSimulation,
 } from "@/lib/simkon/towerCraneEngine";
-import { defaultConfig, type SimulationResult } from "@/lib/simkon/engine";
+import {
+  DIST_LABELS,
+  defaultConfig,
+  fromMeanCv,
+  type DistKind,
+  type DurationDist,
+  type SimulationResult,
+} from "@/lib/simkon/engine";
 import { ResultsPanel } from "@/components/simkon/ResultsPanel";
 import { MetricCard } from "@/components/simkon/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -23,6 +38,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatNum } from "@/lib/utils";
+
+const DIST_KEYS = Object.keys(DIST_LABELS) as DistKind[];
 
 function Field({
   label,
@@ -67,6 +84,33 @@ function Field({
   );
 }
 
+function rebuildDist(base: DurationDist, kind: DistKind, cv: number): DurationDist {
+  if (kind === "constant") return { ...base, kind: "constant", mean: base.mean, cv: 0 };
+  if (kind === "exponential") return fromMeanCv(base.mean, 1, "exponential");
+  if (kind === "beta") {
+    return {
+      ...base,
+      kind: "beta",
+      mean: base.mean,
+      cv,
+      alpha: base.alpha ?? 2,
+      beta_shape: base.beta_shape ?? 2,
+      min_bound: base.min_bound ?? Math.max(0.05, base.mean * 0.5),
+      max_bound: base.max_bound ?? base.mean * 1.5,
+    };
+  }
+  return fromMeanCv(base.mean, cv, kind);
+}
+
+function ensureDist(
+  dist: DurationDist | null | undefined,
+  mean: number,
+  fallbackKind: DistKind,
+): DurationDist {
+  if (dist) return { ...dist, mean };
+  return fromMeanCv(mean, fallbackKind === "exponential" ? 1 : 0.2, fallbackKind);
+}
+
 type ResultExtra = SimulationResult & {
   front_stats?: Array<{
     id: number;
@@ -76,13 +120,101 @@ type ResultExtra = SimulationResult & {
     volume: number;
     wait_avg: number;
     wait_total: number;
+    requests: number;
   }>;
 };
 
+function DistRow({
+  label,
+  hint,
+  mean,
+  dist,
+  maxMean,
+  defaultKind,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  mean: number;
+  dist: DurationDist;
+  maxMean: number;
+  defaultKind: DistKind;
+  onChange: (mean: number, dist: DurationDist) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-[var(--radius-md)] border border-border/70 bg-muted/10 p-3">
+      <div>
+        <p className="text-xs font-medium text-foreground">{label}</p>
+        <p className="text-[11px] text-muted-foreground">{hint}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Mean (menit)</Label>
+          <Input
+            type="number"
+            className="h-9 tabular-nums"
+            min={0.5}
+            max={maxMean}
+            step={0.1}
+            value={mean}
+            onChange={(e) => {
+              const m = Math.max(0.5, Number(e.target.value) || 0.5);
+              onChange(m, rebuildDist({ ...dist, mean: m }, dist.kind, dist.cv));
+            }}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Distribusi</Label>
+          <Select
+            value={dist.kind}
+            onValueChange={(kind) => {
+              const k = kind as DistKind;
+              const cv = k === "exponential" ? 1 : k === "constant" ? 0 : dist.cv > 0 ? dist.cv : 0.2;
+              onChange(mean, rebuildDist({ ...dist, mean, kind: k, cv }, k, cv));
+            }}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DIST_KEYS.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {DIST_LABELS[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {dist.kind !== "constant" && dist.kind !== "beta" && dist.kind !== "exponential" ? (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="text-xs text-muted-foreground">
+              CV · {dist.cv.toFixed(2)}
+            </Label>
+            <Slider
+              min={0}
+              max={1}
+              step={0.01}
+              value={[dist.cv]}
+              onValueChange={([cv]) =>
+                onChange(mean, rebuildDist({ ...dist, mean, cv }, dist.kind, cv))
+              }
+            />
+          </div>
+        ) : null}
+        {dist.kind === "exponential" ? (
+          <p className="text-[11px] text-muted-foreground sm:col-span-2">
+            Poisson process: inter-arrival ~ Exp(mean). CV tetap 1. Rate λ = 1/mean ≈{" "}
+            {formatNum(60 / Math.max(0.5, mean), 1)} permintaan/jam.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function TowerCranePanel() {
-  const [fields, setFields] = useState<TowerCraneFields>(towerCraneDefaults());
+  const [fields, setFields] = useState<TowerCraneFields>(() => towerCraneDefaults());
   const [seed, setSeed] = useState(12345);
-  /** Waktu operasi maksimum (jam) — default shift 8 jam */
   const [maxHours, setMaxHours] = useState(8);
   const [costCrane, setCostCrane] = useState(500_000);
   const [costOp, setCostOp] = useState(150_000);
@@ -138,29 +270,29 @@ export function TowerCranePanel() {
     <div className="space-y-6">
       <Card className="border-primary/20">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Tower crane · multi-front + prioritas</CardTitle>
+          <CardTitle className="text-base">Tower crane · Poisson request + service</CardTitle>
           <CardDescription className="leading-relaxed">
-            Crane = <strong className="text-foreground">single server</strong>. Material dari{" "}
-            <strong className="text-foreground">yard</strong> ke front A/B/C. Antrian{" "}
-            <strong className="text-foreground">prioritas 1 → 9</strong>, lalu FIFO. Simulasi
-            berhenti pada <strong className="text-foreground">waktu operasi maksimum</strong>{" "}
-            (default 8 jam) — tanpa target volume.
+            Crane = <strong className="text-foreground">single server</strong>. Tiap front
+            menghasilkan <strong className="text-foreground">permintaan berulang</strong>{" "}
+            (default proses Poisson / Exp). Saat dilayani:{" "}
+            <strong className="text-foreground">satu durasi service</strong> (mean +
+            distribusi) karena lokasi front berbeda. Antrian prioritas 1→9, non-preemptive.
+            Stop: <strong className="text-foreground">waktu operasi maks</strong> (default 8 jam).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20">
             <img
               src="/illustrations/tower-crane-multi-front.jpg"
-              alt="Tower crane multi-front priority: yard to fronts via single server"
+              alt="Tower crane: yard vs fronts"
               className="mx-auto max-h-64 w-full object-contain object-center p-2 sm:max-h-80"
             />
             <figcaption className="border-t border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
-              <strong className="text-foreground">Yard</strong> →{" "}
-              <strong className="text-foreground">Tower crane (server)</strong> → Front
-              A/B/C. Antrian prioritas 1 dulu, lalu FIFO. Lift: hook→hoist→swing→lower→unhook→return
-              empty.
+              Yard → crane (server) → Front A/B/C. Request Poisson per front; service 1
+              durasi per lift.
             </figcaption>
           </figure>
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field
               label="Jumlah tower crane"
@@ -173,21 +305,13 @@ export function TowerCranePanel() {
               }
             />
             <Field
-              label="Kapasitas angkat"
-              unit="ton"
-              value={fields.capacity_ton}
+              label="Waktu operasi maks"
+              unit="jam"
+              value={maxHours}
               min={0.5}
-              max={20}
+              max={24}
               step={0.5}
-              onChange={(v) => setFields((p) => ({ ...p, capacity_ton: v }))}
-            />
-            <Field
-              label="Faktor beban berat"
-              value={fields.heavy_load_factor}
-              min={1}
-              max={1.5}
-              step={0.05}
-              onChange={(v) => setFields((p) => ({ ...p, heavy_load_factor: v }))}
+              onChange={setMaxHours}
             />
             <Field
               label="Sewa crane"
@@ -208,32 +332,23 @@ export function TowerCranePanel() {
               onChange={(v) => setCostOp(v * 1000)}
             />
             <Field label="Seed" value={seed} min={1} step={1} onChange={(v) => setSeed(Math.floor(v))} />
-            <Field
-              label="Waktu operasi maks"
-              unit="jam"
-              value={maxHours}
-              min={0.5}
-              max={24}
-              step={0.5}
-              onChange={setMaxHours}
-            />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               label="Demand front (teori)"
               value={`${formatNum(theory.demand, 1)} unit/jam`}
-              hint="Σ frekuensi minta × volume"
+              hint="Σ (60/E[inter-arrival]) × vol"
             />
             <MetricCard
               label="Kapasitas crane (teori)"
               value={`${formatNum(theory.crane_cap, 1)} unit/jam`}
-              hint="Tanpa antrian / prioritas"
+              hint="n_crane × 60/E[service] × vol"
             />
             <MetricCard
               label="Util teori demand/cap"
               value={`${formatNum(theory.util_theory * 100, 0)}%`}
-              hint=">100% = crane overload teori"
+              hint=">100% = overload teori"
             />
             <MetricCard
               label="Front aktif"
@@ -244,15 +359,19 @@ export function TowerCranePanel() {
 
           <div className="space-y-3">
             <p className="text-sm font-medium">Work fronts (max 5)</p>
-            {fields.fronts.map((fr) => (
-              <div
-                key={fr.id}
-                className={`space-y-3 rounded-[var(--radius-lg)] border p-3 sm:p-4 ${
-                  fr.enabled ? "border-border bg-card/40" : "border-border/60 bg-muted/20 opacity-70"
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
+            {fields.fronts.map((fr) => {
+              const reqDist = ensureDist(fr.request_dist, fr.request_interval_mean, "exponential");
+              const svcDist = ensureDist(fr.service_dist, fr.service_mean, "normal");
+              return (
+                <div
+                  key={fr.id}
+                  className={`space-y-3 rounded-[var(--radius-lg)] border p-3 sm:p-4 ${
+                    fr.enabled
+                      ? "border-border bg-card/40"
+                      : "border-border/60 bg-muted/20 opacity-70"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-sm font-medium">
                       <input
                         type="checkbox"
@@ -262,107 +381,65 @@ export function TowerCranePanel() {
                       />
                       {fr.name}
                     </label>
+                    <span className="text-xs text-muted-foreground">
+                      Prio {fr.priority} · λ≈{formatNum(60 / fr.request_interval_mean, 1)}
+                      /jam
+                    </span>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    Prioritas {fr.priority} · {fr.payload_ton} t
-                    {fr.payload_ton > fields.capacity_ton ? " · OVERLOAD" : ""}
-                  </span>
+                  {fr.enabled ? (
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <Field
+                          label="Prioritas (1=tinggi)"
+                          value={fr.priority}
+                          min={1}
+                          max={9}
+                          step={1}
+                          onChange={(v) => patchFront(fr.id, { priority: Math.floor(v) })}
+                        />
+                        <Field
+                          label="Volume / lift"
+                          unit="unit"
+                          value={fr.volume_per_lift}
+                          min={0.1}
+                          max={10}
+                          step={0.1}
+                          onChange={(v) => patchFront(fr.id, { volume_per_lift: v })}
+                        />
+                      </div>
+                      <DistRow
+                        label="Permintaan (inter-arrival)"
+                        hint="Default Eksponensial = proses Poisson. Mean = rata-rata menit antar permintaan."
+                        mean={fr.request_interval_mean}
+                        dist={reqDist}
+                        maxMean={120}
+                        defaultKind="exponential"
+                        onChange={(mean, dist) =>
+                          patchFront(fr.id, {
+                            request_interval_mean: mean,
+                            request_dist: dist,
+                          })
+                        }
+                      />
+                      <DistRow
+                        label="Service crane (yard → front → return)"
+                        hint="Satu durasi full trip. Beda front = beda mean (lokasi berbeda)."
+                        mean={fr.service_mean}
+                        dist={svcDist}
+                        maxMean={60}
+                        defaultKind="normal"
+                        onChange={(mean, dist) =>
+                          patchFront(fr.id, {
+                            service_mean: mean,
+                            service_dist: dist,
+                          })
+                        }
+                      />
+                    </div>
+                  ) : null}
                 </div>
-                {fr.enabled ? (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field
-                      label="Prioritas (1=tinggi)"
-                      value={fr.priority}
-                      min={1}
-                      max={9}
-                      step={1}
-                      onChange={(v) => patchFront(fr.id, { priority: Math.floor(v) })}
-                    />
-                    <Field
-                      label="Volume / lift"
-                      unit="unit"
-                      value={fr.volume_per_lift}
-                      min={0.1}
-                      max={10}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { volume_per_lift: v })}
-                    />
-                    <Field
-                      label="Beban"
-                      unit="ton"
-                      value={fr.payload_ton}
-                      min={0.1}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { payload_ton: v })}
-                    />
-                    <Field
-                      label="Local work antar-lift"
-                      unit="mnt"
-                      value={fr.local_work_mean}
-                      min={0.5}
-                      max={60}
-                      step={0.5}
-                      onChange={(v) => patchFront(fr.id, { local_work_mean: v })}
-                    />
-                    <Field
-                      label="Hook / sling"
-                      unit="mnt"
-                      value={fr.hook_mean}
-                      min={0.2}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { hook_mean: v })}
-                    />
-                    <Field
-                      label="Hoist"
-                      unit="mnt"
-                      value={fr.hoist_mean}
-                      min={0.2}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { hoist_mean: v })}
-                    />
-                    <Field
-                      label="Swing / trolley"
-                      unit="mnt"
-                      value={fr.swing_mean}
-                      min={0.2}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { swing_mean: v })}
-                    />
-                    <Field
-                      label="Lower"
-                      unit="mnt"
-                      value={fr.lower_mean}
-                      min={0.2}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { lower_mean: v })}
-                    />
-                    <Field
-                      label="Unhook"
-                      unit="mnt"
-                      value={fr.unhook_mean}
-                      min={0.2}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { unhook_mean: v })}
-                    />
-                    <Field
-                      label="Return empty"
-                      unit="mnt"
-                      value={fr.return_empty_mean}
-                      min={0.2}
-                      max={20}
-                      step={0.1}
-                      onChange={(v) => patchFront(fr.id, { return_empty_mean: v })}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -395,15 +472,17 @@ export function TowerCranePanel() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Hasil per front</CardTitle>
             <CardDescription>
-              Wait tinggi pada prioritas rendah = crane sibuk melayani front penting dulu.
+              Requests = jumlah permintaan Poisson. Lifts = terlayani. Wait tinggi pada prio
+              rendah = crane sibuk di front penting.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
+            <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Front</th>
                   <th className="py-2 pr-3 font-medium">Prio</th>
+                  <th className="py-2 pr-3 font-medium">Requests</th>
                   <th className="py-2 pr-3 font-medium">Lifts</th>
                   <th className="py-2 pr-3 font-medium">Volume</th>
                   <th className="py-2 font-medium">Wait avg</th>
@@ -414,6 +493,7 @@ export function TowerCranePanel() {
                   <tr key={s.id} className="border-b border-border/60">
                     <td className="py-2 pr-3 font-medium">{s.name}</td>
                     <td className="py-2 pr-3">{s.priority}</td>
+                    <td className="py-2 pr-3">{s.requests}</td>
                     <td className="py-2 pr-3">{s.lifts}</td>
                     <td className="py-2 pr-3">{formatNum(s.volume, 1)}</td>
                     <td className="py-2">{formatNum(s.wait_avg, 1)} mnt</td>
@@ -425,16 +505,7 @@ export function TowerCranePanel() {
         </Card>
       ) : null}
 
-      {result ? (
-        <ResultsPanel result={result} />
-      ) : (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Aktifkan front, set prioritas, lalu{" "}
-            <strong className="text-foreground">Jalankan simulasi</strong>.
-          </CardContent>
-        </Card>
-      )}
+      {result ? <ResultsPanel result={result} /> : null}
     </div>
   );
 }

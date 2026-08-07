@@ -547,7 +547,7 @@ export function ParameterPanel({
                     </Select>
                   </div>
                 </div>
-                {dist.kind !== "constant" && dist.kind !== "beta" ? (
+                {dist.kind !== "constant" && dist.kind !== "beta" && dist.kind !== "exponential" ? (
                   <div className="mt-3">
                     <Field label="CV (std/mean)" value={dist.cv.toFixed(2)}>
                       <Slider

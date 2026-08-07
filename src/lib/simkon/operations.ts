@@ -243,7 +243,7 @@ export const OPERATIONS: OperationInfo[] = [
     title: "Tower Crane (multi-front)",
     shortTitle: "Tower Crane",
     description:
-      "Satu tower crane melayani 1–5 front pekerjaan. Material dari yard diangkat ke masing-masing front dengan sistem prioritas. Ukuran sibuk crane dan bottleneck terhadap pekerjaan lain.",
+      "Satu tower crane (single server) melayani 1–5 front. Permintaan per front = proses Poisson (Exp). Service = 1 durasi mean+distribusi per front. Prioritas non-preemptive. Stop: waktu operasi (default 8 jam).",
     tasks: [
       { key: "load", label: "Hook / sling" },
       { key: "haul", label: "Hoist + swing" },

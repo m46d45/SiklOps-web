@@ -1,9 +1,12 @@
 /**
- * Tower Crane — single server, multi-front priority DES
+ * Tower Crane — single server, multi-front, simple Poisson + service DES
  *
- * Satu tower crane melayani 1–5 front pekerjaan. Material di ground yard diangkat
- * ke masing-masing front. Antrian request memakai prioritas (1 = tertinggi).
- * Tujuan: util crane, waktu tunggu per front, apakah crane jadi bottleneck.
+ * Per front:
+ *  - Request arrivals: Poisson process → inter-arrival Exponential(mean_request_interval)
+ *  - Service time when crane serves that front: mean + DurationDist
+ *  - Priority 1 = highest (preempt? no — non-preemptive priority queue)
+ *
+ * Crane: one (or two) server(s). Stop by max operation time (default 8h).
  */
 
 import { Rng } from "./rng";
@@ -16,6 +19,7 @@ import {
   type DurationDist,
   sampleDuration,
   resolveDist,
+  type DistKind,
 } from "./engine";
 
 export function isTowerCraneOperation(op: string | undefined): boolean {
@@ -29,50 +33,40 @@ export type CraneFront = {
   priority: number;
   /** volume/unit kerja per lift */
   volume_per_lift: number;
-  /** beban (ton) — dibandingkan kapasitas crane */
-  payload_ton: number;
-  /** waktu di ground hook+sling (menit) */
-  hook_mean: number;
-  hoist_mean: number;
-  swing_mean: number;
-  lower_mean: number;
-  unhook_mean: number;
-  return_empty_mean: number;
-  /** kerja lokal di front sebelum minta lift berikutnya */
-  local_work_mean: number;
+  /**
+   * Mean inter-arrival permintaan (menit).
+   * Poisson process → Exp(mean). Rate λ = 1/mean.
+   */
+  request_interval_mean: number;
+  /** Mean durasi service crane untuk front ini (menit, full trip yard↔front) */
+  service_mean: number;
+  /** Distribusi inter-arrival (default exponential = Poisson process) */
+  request_dist?: DurationDist | null;
+  /** Distribusi service */
+  service_dist?: DurationDist | null;
   enabled: boolean;
 };
 
 export type TowerCraneFields = {
   num_cranes: number;
-  capacity_ton: number;
-  /** sedikit lebih lambat jika payload > 70% kapasitas */
-  heavy_load_factor: number;
   fronts: CraneFront[];
-  hook_dist?: DurationDist | null;
-  hoist_dist?: DurationDist | null;
-  swing_dist?: DurationDist | null;
-  lower_dist?: DurationDist | null;
-  unhook_dist?: DurationDist | null;
-  return_dist?: DurationDist | null;
-  local_dist?: DurationDist | null;
 };
 
 export function defaultFronts(): CraneFront[] {
+  const exp = (mean: number): DurationDist =>
+    fromMeanCv(mean, 1, "exponential"); // CV≈1 for exponential
+  const svc = (mean: number): DurationDist => fromMeanCv(mean, 0.2, "normal");
+
   return [
     {
       id: 0,
       name: "Front A · formwork",
       priority: 1,
       volume_per_lift: 1.2,
-      payload_ton: 1.5,
-      hook_mean: 1.2,
-      hoist_mean: 1.8,
-      swing_mean: 1.0,
-      lower_mean: 1.2,
-      unhook_mean: 0.8,
-      return_empty_mean: 1.5,
-      local_work_mean: 8,
+      request_interval_mean: 12,
+      service_mean: 7.5,
+      request_dist: exp(12),
+      service_dist: svc(7.5),
       enabled: true,
     },
     {
@@ -80,14 +74,10 @@ export function defaultFronts(): CraneFront[] {
       name: "Front B · rebar",
       priority: 2,
       volume_per_lift: 0.8,
-      payload_ton: 1.0,
-      hook_mean: 1.0,
-      hoist_mean: 1.5,
-      swing_mean: 0.9,
-      lower_mean: 1.0,
-      unhook_mean: 0.7,
-      return_empty_mean: 1.3,
-      local_work_mean: 6,
+      request_interval_mean: 10,
+      service_mean: 6.4,
+      request_dist: exp(10),
+      service_dist: svc(6.4),
       enabled: true,
     },
     {
@@ -95,14 +85,10 @@ export function defaultFronts(): CraneFront[] {
       name: "Front C · concrete bucket",
       priority: 1,
       volume_per_lift: 1.0,
-      payload_ton: 2.5,
-      hook_mean: 1.5,
-      hoist_mean: 2.2,
-      swing_mean: 1.2,
-      lower_mean: 1.5,
-      unhook_mean: 1.0,
-      return_empty_mean: 1.8,
-      local_work_mean: 5,
+      request_interval_mean: 8,
+      service_mean: 9.2,
+      request_dist: exp(8),
+      service_dist: svc(9.2),
       enabled: true,
     },
     {
@@ -110,14 +96,10 @@ export function defaultFronts(): CraneFront[] {
       name: "Front D · MEP",
       priority: 3,
       volume_per_lift: 0.5,
-      payload_ton: 0.6,
-      hook_mean: 0.8,
-      hoist_mean: 1.2,
-      swing_mean: 0.8,
-      lower_mean: 0.9,
-      unhook_mean: 0.6,
-      return_empty_mean: 1.1,
-      local_work_mean: 10,
+      request_interval_mean: 15,
+      service_mean: 5.4,
+      request_dist: exp(15),
+      service_dist: svc(5.4),
       enabled: false,
     },
     {
@@ -125,14 +107,10 @@ export function defaultFronts(): CraneFront[] {
       name: "Front E · finishing",
       priority: 4,
       volume_per_lift: 0.4,
-      payload_ton: 0.4,
-      hook_mean: 0.7,
-      hoist_mean: 1.0,
-      swing_mean: 0.7,
-      lower_mean: 0.8,
-      unhook_mean: 0.5,
-      return_empty_mean: 1.0,
-      local_work_mean: 12,
+      request_interval_mean: 18,
+      service_mean: 4.7,
+      request_dist: exp(18),
+      service_dist: svc(4.7),
       enabled: false,
     },
   ];
@@ -141,8 +119,6 @@ export function defaultFronts(): CraneFront[] {
 export function towerCraneDefaults(): TowerCraneFields {
   return {
     num_cranes: 1,
-    capacity_ton: 5,
-    heavy_load_factor: 1.15,
     fronts: defaultFronts(),
   };
 }
@@ -153,26 +129,59 @@ export function readTowerCraneFields(cfg: SimulationConfig): TowerCraneFields {
     crane_fronts_json?: string;
   };
   let fronts = d.fronts;
-  if (Array.isArray(c.fronts) && c.fronts.length) fronts = c.fronts;
+  if (Array.isArray(c.fronts) && c.fronts.length) fronts = c.fronts as CraneFront[];
   else if (typeof c.crane_fronts_json === "string") {
     try {
       const parsed = JSON.parse(c.crane_fronts_json) as CraneFront[];
       if (Array.isArray(parsed) && parsed.length) fronts = parsed;
     } catch {
-      /* keep default */
+      /* keep */
     }
   }
+
+  const defs = defaultFronts();
   return {
     num_cranes: Math.max(1, Math.min(2, Math.floor(c.num_cranes ?? 1))),
-    capacity_ton: Math.max(0.5, c.capacity_ton ?? d.capacity_ton),
-    heavy_load_factor: Math.max(1, c.heavy_load_factor ?? d.heavy_load_factor),
-    fronts: fronts.map((f, i) => ({
-      ...defaultFronts()[i] ?? defaultFronts()[0],
-      ...f,
-      id: i,
-      priority: Math.max(1, Math.min(9, Math.floor(f.priority || i + 1))),
-      enabled: f.enabled !== false,
-    })),
+    fronts: fronts.map((f, i) => {
+      const base = defs[i] ?? defs[0];
+      // legacy multi-phase → sum service
+      const legacy = f as CraneFront & {
+        hook_mean?: number;
+        hoist_mean?: number;
+        swing_mean?: number;
+        lower_mean?: number;
+        unhook_mean?: number;
+        return_empty_mean?: number;
+        local_work_mean?: number;
+      };
+      const legacySvc =
+        legacy.hook_mean != null
+          ? (legacy.hook_mean ?? 0) +
+            (legacy.hoist_mean ?? 0) +
+            (legacy.swing_mean ?? 0) +
+            (legacy.lower_mean ?? 0) +
+            (legacy.unhook_mean ?? 0) +
+            (legacy.return_empty_mean ?? 0)
+          : null;
+      const reqMean = Math.max(
+        0.5,
+        legacy.request_interval_mean ?? legacy.local_work_mean ?? base.request_interval_mean,
+      );
+      const svcMean = Math.max(0.5, legacy.service_mean ?? legacySvc ?? base.service_mean);
+      return {
+        id: i,
+        name: f.name || base.name,
+        priority: Math.max(1, Math.min(9, Math.floor(f.priority || i + 1))),
+        volume_per_lift: Math.max(0.05, f.volume_per_lift ?? base.volume_per_lift),
+        request_interval_mean: reqMean,
+        service_mean: svcMean,
+        request_dist:
+          f.request_dist ??
+          fromMeanCv(reqMean, 1, "exponential" as DistKind),
+        service_dist: f.service_dist ?? fromMeanCv(svcMean, 0.2, "normal"),
+        enabled: f.enabled !== false,
+      };
+    }),
   };
 }
 
@@ -181,95 +190,63 @@ export function applyTowerCraneToConfig(
   fields?: Partial<TowerCraneFields>,
 ): SimulationConfig {
   const f = { ...readTowerCraneFields(base), ...fields };
-  if (fields?.fronts) f.fronts = fields.fronts;
-  const active = f.fronts.filter((x) => x.enabled);
-  const avgVol =
-    active.length > 0
-      ? active.reduce((s, x) => s + x.volume_per_lift, 0) / active.length
-      : 1;
-  const avgCycle =
-    active.length > 0
-      ? active.reduce(
-          (s, x) =>
-            s +
-            x.hook_mean +
-            x.hoist_mean +
-            x.swing_mean +
-            x.lower_mean +
-            x.unhook_mean +
-            x.return_empty_mean,
-          0,
-        ) / active.length
-      : 8;
+  const fronts = f.fronts;
+  const avgSvc =
+    fronts.filter((x) => x.enabled).reduce((s, x) => s + x.service_mean, 0) /
+      Math.max(1, fronts.filter((x) => x.enabled).length) || 8;
+  const avgReq =
+    fronts.filter((x) => x.enabled).reduce((s, x) => s + x.request_interval_mean, 0) /
+      Math.max(1, fronts.filter((x) => x.enabled).length) || 10;
+
   return {
     ...base,
     operation: "tower_crane",
     num_loaders: f.num_cranes,
-    num_haulers: Math.max(1, active.length),
-    loader_bucket_m3: avgVol,
-    hauler_capacity_m3: avgVol,
-    payload_per_trip: avgVol,
-    load_time_mean: avgCycle * 0.35,
-    haul_time_mean: avgCycle * 0.25,
-    dump_time_mean: avgCycle * 0.2,
-    return_time_mean: avgCycle * 0.2,
-    load_dist: fromMeanCv(avgCycle * 0.35, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
-    haul_dist: fromMeanCv(avgCycle * 0.25, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
-    dump_dist: fromMeanCv(avgCycle * 0.2, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
-    return_dist: fromMeanCv(avgCycle * 0.2, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
+    num_haulers: fronts.filter((x) => x.enabled).length || 1,
+    loader_bucket_m3: 1,
+    hauler_capacity_m3: 1,
+    payload_per_trip: 1,
+    load_time_mean: avgSvc,
+    haul_time_mean: avgReq,
+    dump_time_mean: 0.1,
+    return_time_mean: 0.1,
+    load_dist: fromMeanCv(avgSvc, 0.2, "normal"),
+    haul_dist: fromMeanCv(avgReq, 1, "exponential"),
+    dump_dist: fromMeanCv(0.1, 0, "constant"),
+    return_dist: fromMeanCv(0.1, 0, "constant"),
     num_cranes: f.num_cranes,
-    capacity_ton: f.capacity_ton,
-    heavy_load_factor: f.heavy_load_factor,
-    crane_fronts_json: JSON.stringify(f.fronts),
     fronts: f.fronts,
+    crane_fronts_json: JSON.stringify(f.fronts),
     cost_loader_per_hour: base.cost_loader_per_hour || 500_000,
-    cost_hauler_per_hour: base.cost_hauler_per_hour || 0,
-    fuel_loader_work_lph: base.fuel_loader_work_lph || 12,
-    fuel_loader_idle_lph: base.fuel_loader_idle_lph || 4,
+    cost_hauler_per_hour: 0,
+    fuel_loader_work_lph: base.fuel_loader_work_lph || 8,
+    fuel_loader_idle_lph: base.fuel_loader_idle_lph || 2,
     fuel_hauler_work_lph: 0,
     fuel_hauler_idle_lph: 0,
+    emission_loader_work_kg_per_h: base.emission_loader_work_kg_per_h || 21,
+    emission_loader_idle_kg_per_h: base.emission_loader_idle_kg_per_h || 5.3,
+    emission_hauler_work_kg_per_h: 0,
+    emission_hauler_idle_kg_per_h: 0,
   } as SimulationConfig;
 }
 
 type Req = {
   frontId: number;
   priority: number;
-  tRequest: number;
+  arrive: number;
   seq: number;
 };
 
-type EvKind =
-  | "front_request"
-  | "crane_hook_done"
-  | "crane_hoist_done"
-  | "crane_swing_done"
-  | "crane_lower_done"
-  | "crane_unhook_done"
-  | "crane_return_done"
-  | "front_local_done";
+type EvKind = "request" | "service_done";
+type Ev = { t: number; kind: EvKind; frontId: number; craneId?: number; seq: number };
 
-type Ev = {
-  t: number;
-  kind: EvKind;
-  frontId: number;
-  craneId: number;
-  seq: number;
-  vol?: number;
-};
-
-function sample(
+function sampleDist(
   rng: Rng,
   config: SimulationConfig,
   mean: number,
   dist?: DurationDist | null,
 ): number {
-  return sampleDuration(resolveDist(config, dist ?? null, mean), rng);
-}
-
-function loadFactor(payload: number, cap: number, heavy: number): number {
-  if (payload > cap + 1e-9) return -1; // overload — skip / reject
-  if (payload > cap * 0.7) return heavy;
-  return 1;
+  return Math.max(0.05, sampleDuration(resolveDist(config, dist ?? null, mean), rng));
 }
 
 export type FrontStats = {
@@ -278,10 +255,9 @@ export type FrontStats = {
   priority: number;
   lifts: number;
   volume: number;
-  wait_total: number;
   wait_avg: number;
-  busy_local: number;
-  waiting_for_crane: number;
+  wait_total: number;
+  requests: number;
 };
 
 export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationResult & {
@@ -291,24 +267,15 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
   const config = applyTowerCraneToConfig(configIn, f);
   const rng = new Rng(config.seed);
 
-  let maxHorizon = config.simulation_duration > 0 ? config.simulation_duration : 8 * 60;
-  let targetCycles = Math.max(0, Math.floor(config.target_cycles || 0));
-  let targetVolume = Math.max(0, Number(config.target_volume) || 0);
-  // Tower crane default stop: waktu operasi maksimum (bukan volume).
-  // target_cycles/volume only if explicitly > 0.
-  if (targetCycles <= 0 && targetVolume <= 0 && !(config.simulation_duration > 0)) {
-    maxHorizon = 8 * 60;
-  }
+  const maxHorizon =
+    config.simulation_duration > 0 ? config.simulation_duration : 8 * 60;
 
   const fronts = f.fronts.filter((x) => x.enabled);
   const nCrane = f.num_cranes;
-  const nFront = fronts.length;
-  if (nFront === 0) {
-    // degenerate empty
-    return runEmpty(config, maxHorizon);
+  if (fronts.length === 0) {
+    return emptyResult(config, maxHorizon);
   }
 
-  const frontById = new Map(fronts.map((x) => [x.id, x]));
   const events: Ev[] = [];
   let seq = 0;
   const push = (e: Omit<Ev, "seq">) => {
@@ -317,379 +284,236 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
     events.sort((a, b) => a.t - b.t || a.seq - b.seq);
   };
 
-  const craneFree: boolean[] = Array(nCrane).fill(true);
   const queue: Req[] = [];
   let reqSeq = 0;
+  const craneBusy = Array(nCrane).fill(false) as boolean[];
+  const craneBusyInt: [number, number][][] = Array.from({ length: nCrane }, () => []);
+  const activityLog: ActivityLog[] = [];
+  const cycleLog: CycleLog[] = [];
+  const arrivalTimes: number[] = [];
+  const serviceTimes: number[] = [];
+  const waitSamples: number[] = [];
 
-  // per front
-  const waitingSince: number[] = Array(5).fill(-1);
-  const stats: FrontStats[] = fronts.map((fr) => ({
+  const stats = fronts.map((fr) => ({
     id: fr.id,
     name: fr.name,
     priority: fr.priority,
     lifts: 0,
     volume: 0,
     wait_total: 0,
-    wait_avg: 0,
-    busy_local: 0,
-    waiting_for_crane: 0,
+    requests: 0,
+    waits: [] as number[],
   }));
-  const statIdx = new Map(stats.map((s, i) => [s.id, i]));
-
-  const craneBusyInt: [number, number][][] = Array.from({ length: nCrane }, () => []);
-  const activityLog: ActivityLog[] = [];
-  const cycleLog: CycleLog[] = [];
-  const waitSamples: number[] = [];
-  const arrivalTimes: number[] = [];
-  const serviceTimes: number[] = [];
+  const statById = new Map(stats.map((s) => [s.id, s]));
+  const frontById = new Map(fronts.map((fr) => [fr.id, fr]));
 
   let totalTrips = 0;
   let totalVolume = 0;
-  let stopReason = "duration";
-  let endTime = maxHorizon;
-  let reached = false;
-
   const timelineVolume: [number, number][] = [[0, 0]];
   const queueOverTime: [number, number][] = [[0, 0]];
   let lastChange = 0;
   let qIntegral = 0;
   let maxQueue = 0;
+  let queueLen = 0;
 
   const integrateQ = (t: number) => {
     t = Math.min(t, maxHorizon);
     if (t > lastChange) {
-      qIntegral += queue.length * (t - lastChange);
+      qIntegral += queueLen * (t - lastChange);
       lastChange = t;
     }
   };
   const snapQ = (t: number) => {
-    maxQueue = Math.max(maxQueue, queue.length);
+    maxQueue = Math.max(maxQueue, queueLen);
     const last = queueOverTime[queueOverTime.length - 1];
-    if (!last || last[1] !== queue.length) {
-      queueOverTime.push([Math.min(t, maxHorizon), queue.length]);
+    if (!last || last[1] !== queueLen) {
+      queueOverTime.push([Math.min(t, maxHorizon), queueLen]);
     }
   };
 
-  const markBusy = (cid: number, start: number, dur: number) => {
-    const s = Math.max(0, start);
-    const e = Math.min(maxHorizon, start + dur);
-    if (e > s) craneBusyInt[cid].push([s, e]);
-  };
-  const recAct = (hid: number, phase: string, start: number, dur: number) => {
-    const s = Math.max(0, start);
-    const e = Math.min(maxHorizon, start + dur);
-    if (e > s) activityLog.push({ hauler_id: hid, phase, start: s, end: e, duration: e - s });
+  const scheduleNextRequest = (frontId: number, from: number) => {
+    const fr = frontById.get(frontId);
+    if (!fr) return;
+    const ia = sampleDist(rng, config, fr.request_interval_mean, fr.request_dist);
+    const t = from + ia;
+    if (t <= maxHorizon + 1e-9) {
+      push({ t, kind: "request", frontId });
+    }
   };
 
-  const pickRequest = (): Req | null => {
+  const pickFromQueue = (): Req | null => {
     if (!queue.length) return null;
-    // priority ASC (1 first), then earliest request
-    queue.sort((a, b) => a.priority - b.priority || a.tRequest - b.tRequest || a.seq - b.seq);
+    // priority min first, then FIFO (seq)
+    queue.sort((a, b) => a.priority - b.priority || a.seq - b.seq);
     return queue.shift()!;
   };
 
   const tryDispatch = (now: number) => {
-    if (reached) return;
-    for (let cid = 0; cid < nCrane; cid++) {
-      if (!craneFree[cid]) continue;
-      const req = pickRequest();
+    for (let c = 0; c < nCrane; c++) {
+      if (craneBusy[c]) continue;
+      const req = pickFromQueue();
       if (!req) return;
+      queueLen = Math.max(0, queueLen - 1);
       integrateQ(now);
       snapQ(now);
+
       const fr = frontById.get(req.frontId);
       if (!fr) continue;
-      const lf = loadFactor(fr.payload_ton, f.capacity_ton, f.heavy_load_factor);
-      if (lf < 0) {
-        // overload: reject, front retries after short delay as new request
-        push({
-          t: now + 0.5,
-          kind: "front_request",
-          frontId: fr.id,
-          craneId: -1,
-        });
-        continue;
-      }
-      craneFree[cid] = false;
-      const wait = Math.max(0, now - req.tRequest);
+      const wait = Math.max(0, now - req.arrive);
       waitSamples.push(wait);
-      const si = statIdx.get(fr.id);
-      if (si != null) {
-        stats[si].wait_total += wait;
-        if (waitingSince[fr.id] >= 0) {
-          stats[si].waiting_for_crane += Math.max(0, now - waitingSince[fr.id]);
-          waitingSince[fr.id] = -1;
-        }
+      const st = statById.get(req.frontId);
+      if (st) {
+        st.wait_total += wait;
+        st.waits.push(wait);
       }
-      arrivalTimes.push(now);
-      const d = sample(rng, config, fr.hook_mean, f.hook_dist) * lf;
-      markBusy(cid, now, d);
-      recAct(cid, "hook", now, d);
-      push({
-        t: now + d,
-        kind: "crane_hook_done",
-        frontId: fr.id,
-        craneId: cid,
-        vol: fr.volume_per_lift,
+
+      const svc = sampleDist(rng, config, fr.service_mean, fr.service_dist);
+      serviceTimes.push(svc);
+      arrivalTimes.push(req.arrive);
+      craneBusy[c] = true;
+      const end = Math.min(maxHorizon, now + svc);
+      if (end > now) craneBusyInt[c].push([now, end]);
+      activityLog.push({
+        hauler_id: req.frontId,
+        phase: "service",
+        start: now,
+        end: now + svc,
+        duration: svc,
       });
+      push({ t: now + svc, kind: "service_done", frontId: req.frontId, craneId: c });
     }
   };
 
-  const enqueue = (now: number, frontId: number) => {
-    const fr = frontById.get(frontId);
-    if (!fr || reached) return;
-    reqSeq += 1;
-    queue.push({
-      frontId,
-      priority: fr.priority,
-      tRequest: now,
-      seq: reqSeq,
-    });
-    waitingSince[frontId] = now;
-    integrateQ(now);
-    snapQ(now);
-    tryDispatch(now);
-  };
-
-  // bootstrap: each front requests first lift at t=0 (+ tiny stagger)
-  fronts.forEach((fr, i) => {
-    push({ t: i * 0.01, kind: "front_request", frontId: fr.id, craneId: -1 });
-  });
+  // initial requests: first arrival after Exp from t=0
+  for (const fr of fronts) {
+    scheduleNextRequest(fr.id, 0);
+  }
 
   let safety = 0;
-  while (events.length > 0 && safety < 2_000_000) {
+  while (events.length > 0 && safety < 5_000_000) {
     safety += 1;
     const ev = events.shift()!;
     const now = ev.t;
     if (now > maxHorizon + 1e-9) break;
-    const fr = frontById.get(ev.frontId);
 
-    switch (ev.kind) {
-      case "front_request":
-        enqueue(now, ev.frontId);
-        break;
+    if (ev.kind === "request") {
+      const fr = frontById.get(ev.frontId);
+      if (!fr) continue;
+      const st = statById.get(ev.frontId);
+      if (st) st.requests += 1;
 
-      case "crane_hook_done": {
-        if (!fr) break;
-        const lf = Math.max(1, loadFactor(fr.payload_ton, f.capacity_ton, f.heavy_load_factor));
-        const d = sample(rng, config, fr.hoist_mean, f.hoist_dist) * lf;
-        markBusy(ev.craneId, now, d);
-        recAct(ev.craneId, "hoist", now, d);
-        push({
-          t: now + d,
-          kind: "crane_hoist_done",
-          frontId: fr.id,
-          craneId: ev.craneId,
-          vol: ev.vol,
-        });
-        break;
-      }
-      case "crane_hoist_done": {
-        if (!fr) break;
-        const d = sample(rng, config, fr.swing_mean, f.swing_dist);
-        markBusy(ev.craneId, now, d);
-        recAct(ev.craneId, "swing", now, d);
-        push({
-          t: now + d,
-          kind: "crane_swing_done",
-          frontId: fr.id,
-          craneId: ev.craneId,
-          vol: ev.vol,
-        });
-        break;
-      }
-      case "crane_swing_done": {
-        if (!fr) break;
-        const lf = Math.max(1, loadFactor(fr.payload_ton, f.capacity_ton, f.heavy_load_factor));
-        const d = sample(rng, config, fr.lower_mean, f.lower_dist) * lf;
-        markBusy(ev.craneId, now, d);
-        recAct(ev.craneId, "lower", now, d);
-        push({
-          t: now + d,
-          kind: "crane_lower_done",
-          frontId: fr.id,
-          craneId: ev.craneId,
-          vol: ev.vol,
-        });
-        break;
-      }
-      case "crane_lower_done": {
-        if (!fr) break;
-        const d = sample(rng, config, fr.unhook_mean, f.unhook_dist);
-        markBusy(ev.craneId, now, d);
-        recAct(ev.craneId, "unhook", now, d);
-        serviceTimes.push(d);
-        push({
-          t: now + d,
-          kind: "crane_unhook_done",
-          frontId: fr.id,
-          craneId: ev.craneId,
-          vol: ev.vol,
-        });
-        break;
-      }
-      case "crane_unhook_done": {
-        // material delivered — count production; front starts local work; crane returns empty
-        if (fr) {
-          const vol = ev.vol ?? fr.volume_per_lift;
-          totalTrips += 1;
-          totalVolume += vol;
-          timelineVolume.push([now, totalVolume]);
-          const si = statIdx.get(fr.id);
-          if (si != null) {
-            stats[si].lifts += 1;
-            stats[si].volume += vol;
-          }
-          const cycle =
-            fr.hook_mean +
-            fr.hoist_mean +
-            fr.swing_mean +
-            fr.lower_mean +
-            fr.unhook_mean +
-            fr.return_empty_mean;
-          cycleLog.push({
-            hauler_id: fr.id,
-            trip: totalTrips,
-            wait: 0,
-            load: fr.hook_mean,
-            haul: fr.hoist_mean + fr.swing_mean,
-            dump: fr.lower_mean + fr.unhook_mean,
-            return: fr.return_empty_mean,
-            cycle_time: cycle,
-            productive_time: cycle - fr.return_empty_mean,
-            finish_time: now,
-            return_finish: now,
-            volume: vol,
-            productivity: vol > 0 ? vol / Math.max(1e-9, cycle / 60) : 0,
-          });
+      reqSeq += 1;
+      queue.push({
+        frontId: ev.frontId,
+        priority: fr.priority,
+        arrive: now,
+        seq: reqSeq,
+      });
+      queueLen += 1;
+      integrateQ(now);
+      snapQ(now);
 
-          if (!reached) {
-            const hitC = targetCycles > 0 && totalTrips >= targetCycles;
-            const hitV = targetVolume > 0 && totalVolume >= targetVolume - 1e-9;
-            const mode = config.stop_mode ?? "either";
-            if (hitC && hitV) {
-              reached = true;
-              stopReason = "target_both";
-              endTime = now;
-            } else if (mode === "either" && (hitC || hitV)) {
-              reached = true;
-              stopReason = hitC ? "target_cycles" : "target_volume";
-              endTime = now;
-            } else if (mode === "cycles" && hitC) {
-              reached = true;
-              stopReason = "target_cycles";
-              endTime = now;
-            } else if (mode === "volume" && hitV) {
-              reached = true;
-              stopReason = "target_volume";
-              endTime = now;
-            }
-          }
-
-          if (!reached) {
-            const ld = sample(rng, config, fr.local_work_mean, f.local_dist);
-            const si2 = statIdx.get(fr.id);
-            if (si2 != null) stats[si2].busy_local += ld;
-            push({
-              t: now + ld,
-              kind: "front_local_done",
-              frontId: fr.id,
-              craneId: -1,
-            });
-          }
-        }
-        const d = fr
-          ? sample(rng, config, fr.return_empty_mean, f.return_dist)
-          : 1;
-        markBusy(ev.craneId, now, d);
-        recAct(ev.craneId, "return_empty", now, d);
-        push({
-          t: now + d,
-          kind: "crane_return_done",
-          frontId: ev.frontId,
-          craneId: ev.craneId,
+      // next Poisson request for this front
+      scheduleNextRequest(ev.frontId, now);
+      tryDispatch(now);
+    } else {
+      // service done
+      const c = ev.craneId ?? 0;
+      craneBusy[c] = false;
+      const fr = frontById.get(ev.frontId);
+      const st = statById.get(ev.frontId);
+      if (fr && st) {
+        st.lifts += 1;
+        st.volume += fr.volume_per_lift;
+        totalTrips += 1;
+        totalVolume += fr.volume_per_lift;
+        timelineVolume.push([now, totalVolume]);
+        cycleLog.push({
+          hauler_id: ev.frontId,
+          trip: totalTrips,
+          wait: 0,
+          load: fr.service_mean,
+          haul: 0,
+          dump: 0,
+          return: 0,
+          cycle_time: fr.service_mean,
+          productive_time: fr.service_mean,
+          finish_time: now,
+          return_finish: now,
+          volume: fr.volume_per_lift,
+          productivity:
+            fr.volume_per_lift > 0
+              ? fr.volume_per_lift / Math.max(1e-9, fr.service_mean / 60)
+              : 0,
         });
-        break;
       }
-      case "crane_return_done":
-        craneFree[ev.craneId] = true;
-        tryDispatch(now);
-        break;
-
-      case "front_local_done":
-        if (!reached) enqueue(now, ev.frontId);
-        break;
-    }
-    if (reached && events.every((e) => e.kind === "crane_return_done" || e.t > endTime)) {
-      // allow crane to finish return
+      tryDispatch(now);
     }
   }
 
-  if (!reached) {
-    endTime = maxHorizon;
-    stopReason = targetCycles > 0 || targetVolume > 0 ? "duration_cap" : "duration";
-  }
-  integrateQ(endTime);
-  snapQ(endTime);
-
-  const horizon = Math.max(endTime, 1e-9);
+  integrateQ(maxHorizon);
+  snapQ(maxHorizon);
+  const horizon = maxHorizon;
   const craneBusyMin = craneBusyInt.reduce(
     (s, rows) =>
       s + rows.reduce((a, [x, y]) => a + Math.max(0, Math.min(y, horizon) - Math.max(x, 0)), 0),
     0,
   );
   const loaderUtil = Math.min(1, craneBusyMin / (nCrane * horizon));
-  // "hauler" util ≈ fraction of time fronts not waiting — approximate from local busy
-  const frontLocal = stats.reduce((s, x) => s + x.busy_local, 0);
-  const haulerUtil = Math.min(1, frontLocal / (Math.max(1, nFront) * horizon));
   const avgWait = waitSamples.length
     ? waitSamples.reduce((a, b) => a + b, 0) / waitSamples.length
     : 0;
-  const avgQ = qIntegral / horizon;
+  const avgQ = qIntegral / Math.max(horizon, 1e-9);
   const throughput = (totalVolume / horizon) * 60;
 
-  for (const s of stats) {
-    s.wait_avg = s.lifts > 0 ? s.wait_total / s.lifts : 0;
-  }
+  const front_stats: FrontStats[] = stats.map((s) => ({
+    id: s.id,
+    name: s.name,
+    priority: s.priority,
+    lifts: s.lifts,
+    volume: s.volume,
+    wait_avg: s.waits.length ? s.wait_total / s.waits.length : 0,
+    wait_total: s.wait_total,
+    requests: s.requests,
+  }));
+
+  // hauler util = fraction of front demand waiting? use front busy proxy via wait
+  const totalWait = front_stats.reduce((s, x) => s + x.wait_total, 0);
 
   let bottleneck = "Seimbang";
-  let bottleneck_reason =
-    "Crane dan front relatif seimbang; cek prioritas jika salah satu front menunggu lama.";
-  if (loaderUtil > 0.88) {
+  let bottleneck_reason = "Crane dan frekuensi request relatif seimbang.";
+  if (loaderUtil > 0.9 && avgWait > 1) {
     bottleneck = "Tower crane";
     bottleneck_reason =
-      "Tower crane hampir jenuh — bottleneck distribusi. Naikkan prioritas front kritis, kurangi front aktif, atau tambah crane / percepat cycle angkat.";
-  } else if (avgWait > 5 || avgQ > 1.5) {
-    bottleneck = "Antrian lift";
+      "Crane jenuh + antrian panjang — kurangi front, naikkan prioritas, atau tambah crane.";
+  } else if (loaderUtil < 0.5 && avgWait < 0.5) {
+    bottleneck = "Front (request rendah)";
     bottleneck_reason =
-      "Antrian request panjang — sesuaikan prioritas (1=penting) atau kurangi frekuensi minta lift front rendah.";
-  } else if (loaderUtil < 0.45 && haulerUtil > 0.6) {
-    bottleneck = "Under-utilized crane";
+      "Crane sering idle — front jarang minta (interval Poisson panjang) atau service cepat.";
+  } else if (avgWait > 2) {
+    bottleneck = "Antrian prioritas";
     bottleneck_reason =
-      "Crane longgar; front banyak kerja lokal — crane bukan bottleneck utama.";
+      "Wait tinggi — front prioritas rendah menanti; periksa distribusi request vs service.";
   }
 
   return {
     operation: "tower_crane",
-    config: {
-      ...config,
-      num_loaders: nCrane,
-      num_haulers: nFront,
-    },
+    config: { ...config, num_loaders: nCrane, num_haulers: fronts.length },
     total_trips: totalTrips,
     total_volume: totalVolume,
     throughput_per_hour: throughput,
     simulated_minutes: horizon,
-    stop_reason: stopReason,
-    target_cycles: targetCycles,
-    target_volume: targetVolume,
+    stop_reason: "duration",
+    target_cycles: 0,
+    target_volume: 0,
     loader_utilization: loaderUtil,
-    hauler_utilization: haulerUtil,
+    hauler_utilization: Math.min(1, totalWait / (fronts.length * horizon + 1e-9)),
     loader_busy_minutes: craneBusyMin,
-    hauler_busy_minutes: frontLocal,
+    hauler_busy_minutes: totalWait,
     avg_queue_wait: avgWait,
     avg_queue_length: avgQ,
     max_queue_length: maxQueue,
-    total_wait_time: waitSamples.reduce((a, b) => a + b, 0),
+    total_wait_time: totalWait,
     hauler_wait_ratio: 0,
     completed_load_requests: totalTrips,
     censored_waits: 0,
@@ -701,22 +525,22 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
     cycle_log: cycleLog,
     avg_cycle_components: {
       wait: avgWait,
-      load: fronts.reduce((s, x) => s + x.hook_mean, 0) / nFront,
-      haul: fronts.reduce((s, x) => s + x.hoist_mean + x.swing_mean, 0) / nFront,
-      dump: fronts.reduce((s, x) => s + x.lower_mean + x.unhook_mean, 0) / nFront,
-      return: fronts.reduce((s, x) => s + x.return_empty_mean, 0) / nFront,
+      load: fronts.reduce((s, x) => s + x.service_mean, 0) / fronts.length,
+      haul: fronts.reduce((s, x) => s + x.request_interval_mean, 0) / fronts.length,
+      dump: 0,
+      return: 0,
     },
-    hauler_trips: stats.map((s) => s.lifts),
-    hauler_busy_per_unit: stats.map((s) => s.busy_local),
-    hauler_wait_per_unit: stats.map((s) => s.wait_total),
+    hauler_trips: front_stats.map((s) => s.lifts),
+    hauler_busy_per_unit: front_stats.map((s) => s.lifts * (frontById.get(s.id)?.service_mean ?? 0)),
+    hauler_wait_per_unit: front_stats.map((s) => s.wait_total),
     arrival_times: arrivalTimes,
     service_times: serviceTimes,
     wait_samples: waitSamples,
-    front_stats: stats,
+    front_stats,
   };
 }
 
-function runEmpty(config: SimulationConfig, horizon: number): SimulationResult {
+function emptyResult(config: SimulationConfig, horizon: number): SimulationResult {
   return {
     operation: "tower_crane",
     config,
@@ -744,7 +568,7 @@ function runEmpty(config: SimulationConfig, horizon: number): SimulationResult {
     queue_over_time: [[0, 0]],
     activity_log: [],
     cycle_log: [],
-    avg_cycle_components: {},
+    avg_cycle_components: { wait: 0, load: 0, haul: 0, dump: 0, return: 0 },
     hauler_trips: [],
     hauler_busy_per_unit: [],
     hauler_wait_per_unit: [],
@@ -754,52 +578,26 @@ function runEmpty(config: SimulationConfig, horizon: number): SimulationResult {
   };
 }
 
-/** Teori kasar: kapasitas crane vs demand front */
 export function towerCraneTheory(fields: TowerCraneFields): {
-  crane_cap: number;
   demand: number;
+  crane_cap: number;
   util_theory: number;
-  per_front: Array<{ name: string; demand: number; cycle: number }>;
 } {
   const active = fields.fronts.filter((x) => x.enabled);
-  const per_front = active.map((fr) => {
-    const lift =
-      fr.hook_mean +
-      fr.hoist_mean +
-      fr.swing_mean +
-      fr.lower_mean +
-      fr.unhook_mean +
-      fr.return_empty_mean;
-    const cycle = lift + fr.local_work_mean;
-    const demand = cycle > 0 ? (60 / cycle) * fr.volume_per_lift : 0;
-    return { name: fr.name, demand, cycle };
-  });
-  // crane capacity: if it only served equal share — mean lift cycle
-  const meanLift =
-    active.length > 0
-      ? active.reduce(
-          (s, fr) =>
-            s +
-            fr.hook_mean +
-            fr.hoist_mean +
-            fr.swing_mean +
-            fr.lower_mean +
-            fr.unhook_mean +
-            fr.return_empty_mean,
-          0,
-        ) / active.length
-      : 8;
-  const meanVol =
-    active.length > 0
-      ? active.reduce((s, fr) => s + fr.volume_per_lift, 0) / active.length
-      : 1;
-  const crane_cap =
-    meanLift > 0 ? (60 / meanLift) * fields.num_cranes * meanVol : 0;
-  const demand = per_front.reduce((s, x) => s + x.demand, 0);
+  // demand unit/h = Σ (60 / E[interarrival]) * volume
+  const demand = active.reduce((s, fr) => {
+    const rate = fr.request_interval_mean > 0 ? 60 / fr.request_interval_mean : 0;
+    return s + rate * fr.volume_per_lift;
+  }, 0);
+  // capacity: servers / mean service * avg volume
+  const avgSvc =
+    active.reduce((s, x) => s + x.service_mean, 0) / Math.max(1, active.length) || 1;
+  const avgVol =
+    active.reduce((s, x) => s + x.volume_per_lift, 0) / Math.max(1, active.length) || 1;
+  const crane_cap = fields.num_cranes * (60 / avgSvc) * avgVol;
   return {
-    crane_cap,
     demand,
-    util_theory: crane_cap > 0 ? Math.min(1.5, demand / crane_cap) : 0,
-    per_front,
+    crane_cap,
+    util_theory: crane_cap > 0 ? demand / crane_cap : 0,
   };
 }

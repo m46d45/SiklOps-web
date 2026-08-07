@@ -28,7 +28,7 @@ export const DIESEL_KG_CO2_PER_L = 2.68;
 
 export type OperationType = OperationId;
 
-export type DistKind = "constant" | "normal" | "lognormal" | "gamma" | "beta";
+export type DistKind = "constant" | "normal" | "lognormal" | "gamma" | "beta" | "exponential";
 
 export const DIST_LABELS: Record<DistKind, string> = {
   constant: "Konstan",
@@ -36,6 +36,7 @@ export const DIST_LABELS: Record<DistKind, string> = {
   lognormal: "Log-normal",
   gamma: "Gamma",
   beta: "Beta",
+  exponential: "Eksponensial (Poisson)",
 };
 
 export type DurationDist = {
@@ -90,8 +91,12 @@ export function distToDict(dist: DurationDist) {
 }
 
 export function fromMeanCv(mean: number, cv = 0.2, kind: DistKind = "normal"): DurationDist {
-  if (kind === "constant" || cv <= 0) {
+  if (kind === "constant" || (cv <= 0 && kind !== "exponential")) {
     return makeDist({ kind: "constant", mean, cv: 0 });
+  }
+  if (kind === "exponential") {
+    // Exp always CV = 1; mean = 1/λ
+    return makeDist({ kind: "exponential", mean, cv: 1 });
   }
   if (kind === "beta") {
     const spread = mean > 0 ? Math.max(0.5, 2 * Math.abs(cv) * mean) : 1;
@@ -113,6 +118,13 @@ export function sampleDuration(dist: DurationDist, rng: Rng): number {
   const kind = dist.kind;
 
   if (kind === "constant") return Math.max(minT, dist.mean);
+
+  if (kind === "exponential") {
+    // X ~ Exp(λ), E[X]=mean → X = -mean * ln(U)
+    const mean = Math.max(minT, dist.mean);
+    const u = Math.max(1e-12, Math.min(1 - 1e-12, rng.random()));
+    return Math.max(minT, -mean * Math.log(u));
+  }
 
   if (kind === "normal") {
     const mean = dist.mean;
