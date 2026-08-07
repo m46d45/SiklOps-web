@@ -255,10 +255,24 @@ export type FrontStats = {
   priority: number;
   lifts: number;
   volume: number;
+  /** mean wait request → mulai service (menit) */
   wait_avg: number;
+  /** max wait (menit) */
+  wait_max: number;
+  /** median wait (menit) */
+  wait_p50: number;
+  /** p90 wait (menit) */
+  wait_p90: number;
+  /** total menit-tunggu (sum) */
   wait_total: number;
   requests: number;
 };
+
+function percentile(sorted: number[], p: number): number {
+  if (!sorted.length) return 0;
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil(p * sorted.length) - 1));
+  return sorted[idx];
+}
 
 export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationResult & {
   front_stats?: FrontStats[];
@@ -478,16 +492,22 @@ export function runTowerCraneSimulation(configIn: SimulationConfig): SimulationR
   const avgQ = qIntegral / Math.max(horizon, 1e-9);
   const throughput = (totalVolume / horizon) * 60;
 
-  const front_stats: FrontStats[] = stats.map((s) => ({
-    id: s.id,
-    name: s.name,
-    priority: s.priority,
-    lifts: s.lifts,
-    volume: s.volume,
-    wait_avg: s.waits.length ? s.wait_total / s.waits.length : 0,
-    wait_total: s.wait_total,
-    requests: s.requests,
-  }));
+  const front_stats: FrontStats[] = stats.map((s) => {
+    const sorted = [...s.waits].sort((a, b) => a - b);
+    return {
+      id: s.id,
+      name: s.name,
+      priority: s.priority,
+      lifts: s.lifts,
+      volume: s.volume,
+      wait_avg: sorted.length ? s.wait_total / sorted.length : 0,
+      wait_max: sorted.length ? sorted[sorted.length - 1] : 0,
+      wait_p50: percentile(sorted, 0.5),
+      wait_p90: percentile(sorted, 0.9),
+      wait_total: s.wait_total,
+      requests: s.requests,
+    };
+  });
 
   // hauler util = fraction of front demand waiting? use front busy proxy via wait
   const totalWait = front_stats.reduce((s, x) => s + x.wait_total, 0);

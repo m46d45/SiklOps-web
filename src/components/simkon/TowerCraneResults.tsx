@@ -32,7 +32,11 @@ export type TowerFrontStat = {
   priority: number;
   lifts: number;
   volume: number;
+  /** request → mulai dilayani crane (menit) */
   wait_avg: number;
+  wait_max: number;
+  wait_p50: number;
+  wait_p90: number;
   wait_total: number;
   requests: number;
 };
@@ -68,7 +72,9 @@ export function TowerCraneResults({ result }: Props) {
     name: s.name.replace(/^Front\s*/, "").slice(0, 18),
     lifts: s.lifts,
     requests: s.requests,
-    wait: Math.round(s.wait_avg * 10) / 10,
+    wait_avg: Math.round((s.wait_avg ?? 0) * 10) / 10,
+    wait_max: Math.round((s.wait_max ?? 0) * 10) / 10,
+    wait_p90: Math.round((s.wait_p90 ?? 0) * 10) / 10,
     priority: s.priority,
   }));
 
@@ -161,6 +167,39 @@ export function TowerCraneResults({ result }: Props) {
               hint={result.bottleneck_reason}
             />
           </div>
+
+          <Card className="border-primary/25 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Waktu tunggu per front (request → dilayani)</CardTitle>
+              <CardDescription>
+                Dihitung dari saat front meminta lift sampai crane mulai service. Ini metrik
+                utama dampak prioritas & kesibukan crane.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {frontStats.map((s) => (
+                  <div
+                    key={s.id}
+                    className="rounded-[var(--radius-md)] border border-border bg-card/80 p-3"
+                  >
+                    <p className="text-xs font-medium text-foreground">{s.name}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Prio {s.priority} · {s.requests} request · {s.lifts} lift
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">
+                      {formatNum(s.wait_avg, 1)}
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">mnt</span>
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      avg · p50 {formatNum(s.wait_p50 ?? 0, 1)} · p90{" "}
+                      {formatNum(s.wait_p90 ?? 0, 1)} · max {formatNum(s.wait_max ?? 0, 1)} mnt
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <MetricCard
@@ -276,7 +315,7 @@ export function TowerCraneResults({ result }: Props) {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Wait rata-rata per front (mnt)</CardTitle>
+              <CardTitle className="text-sm">Waktu tunggu request → service (avg, mnt)</CardTitle>
             </CardHeader>
             <CardContent className="h-52">
               <ResponsiveContainer width="100%" height="100%">
@@ -285,7 +324,7 @@ export function TowerCraneResults({ result }: Props) {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="wait" name="Wait avg" fill="#3d6b8a" radius={4} />
+                  <Bar dataKey="wait_avg" name="Wait avg (request→service)" fill="#3d6b8a" radius={4} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -301,7 +340,10 @@ export function TowerCraneResults({ result }: Props) {
                     <th className="py-2 pr-3 font-medium">Requests</th>
                     <th className="py-2 pr-3 font-medium">Lifts</th>
                     <th className="py-2 pr-3 font-medium">Volume</th>
-                    <th className="py-2 font-medium">Wait avg</th>
+                    <th className="py-2 pr-3 font-medium">Wait avg</th>
+                    <th className="py-2 pr-3 font-medium">Wait p50</th>
+                    <th className="py-2 pr-3 font-medium">Wait p90</th>
+                    <th className="py-2 font-medium">Wait max</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -312,7 +354,10 @@ export function TowerCraneResults({ result }: Props) {
                       <td className="py-2 pr-3">{s.requests}</td>
                       <td className="py-2 pr-3">{s.lifts}</td>
                       <td className="py-2 pr-3">{formatNum(s.volume, 1)}</td>
-                      <td className="py-2">{formatNum(s.wait_avg, 1)} mnt</td>
+                      <td className="py-2 pr-3 font-medium tabular-nums">{formatNum(s.wait_avg, 1)} mnt</td>
+                      <td className="py-2 pr-3 tabular-nums">{formatNum(s.wait_p50 ?? 0, 1)} mnt</td>
+                      <td className="py-2 pr-3 tabular-nums">{formatNum(s.wait_p90 ?? 0, 1)} mnt</td>
+                      <td className="py-2 tabular-nums">{formatNum(s.wait_max ?? 0, 1)} mnt</td>
                     </tr>
                   ))}
                 </tbody>

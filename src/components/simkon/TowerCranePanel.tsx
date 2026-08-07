@@ -17,7 +17,7 @@ import {
   type DurationDist,
   type SimulationResult,
 } from "@/lib/simkon/engine";
-import { TowerCraneResults } from "@/components/simkon/TowerCraneResults";
+import { TowerCraneResults, type TowerFrontStat } from "@/components/simkon/TowerCraneResults";
 import { MetricCard } from "@/components/simkon/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,16 +112,7 @@ function ensureDist(
 }
 
 type ResultExtra = SimulationResult & {
-  front_stats?: Array<{
-    id: number;
-    name: string;
-    priority: number;
-    lifts: number;
-    volume: number;
-    wait_avg: number;
-    wait_total: number;
-    requests: number;
-  }>;
+  front_stats?: TowerFrontStat[];
 };
 
 function DistRow({
