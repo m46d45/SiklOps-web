@@ -28,6 +28,10 @@ export type OperationInfo = {
   title: string;
   shortTitle: string;
   description: string;
+  /**
+   * Satu baris di sidebar: model siklus & kompleksitas (sederhana → kompleks).
+   */
+  sidebarBlurb: string;
   tasks: OperationTask[];
   /** Alias string labels for badges */
   taskLabels: string[];
@@ -78,6 +82,7 @@ export const OPERATIONS: OperationInfo[] = [
     shortTitle: "Earthmoving",
     description:
       "Excavator menggali/memuat material ke dump truck di area cut, truck mengangkut ke spoil/disposal, membongkar (dump), lalu kembali ke area galian untuk dimuat lagi.",
+    sidebarBlurb: "1 siklus · excavator + dump truck",
     tasks: [
       { key: "load", label: "Load" },
       { key: "haul", label: "Haul" },
@@ -133,6 +138,7 @@ export const OPERATIONS: OperationInfo[] = [
     shortTitle: "Bricklaying",
     description:
       "Batch bricklaying: helper fetch pile jauh → temp (slot×batch) → lift batch ke scaffold (3 slot max) + ember mortar (3) → tukang pasang. Mortar team always-ready.",
+    sidebarBlurb: "3 siklus · helper + tukang + buffer",
     tasks: [
       { key: "load", label: "Helper fetch (jauh)" },
       { key: "haul", label: "Helper lift bata" },
@@ -190,6 +196,7 @@ export const OPERATIONS: OperationInfo[] = [
     shortTitle: "Concreting",
     description:
       "Ready-mixed concrete: truck-mixer cycle (batching plant ↔ site) interacts with on-site placing (concrete buggy, crane bucket, or pump). Compare methods under the same distance & height scenario.",
+    sidebarBlurb: "2 siklus berinteraksi · RMC + placing",
     tasks: [
       { key: "load", label: "Fill / charge" },
       { key: "haul", label: "Travel / lift / pump" },
@@ -244,6 +251,7 @@ export const OPERATIONS: OperationInfo[] = [
     shortTitle: "Tower Crane",
     description:
       "Satu tower crane (single server) melayani 1–5 front. Permintaan per front = proses Poisson (Exp). Service = 1 durasi mean+distribusi per front. Prioritas non-preemptive. Stop: waktu operasi (default 8 jam).",
+    sidebarBlurb: "Banyak request · 1 server · prioritas",
     tasks: [
       { key: "load", label: "Service crane" },
       { key: "haul", label: "Inter-arrival request" },

@@ -84,6 +84,9 @@ export function OperationSidebar({
         <p className="mb-3 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Operasi
         </p>
+        <p className="mb-3 px-1 text-[11px] leading-relaxed text-muted-foreground">
+          Urutan pembelajaran: sederhana → kompleks
+        </p>
         <ul className="space-y-1">
           {OPERATIONS.map((op) => (
             <li key={op.id}>
@@ -173,7 +176,7 @@ function OperationItem({
           )}
         >
           {op.available
-            ? `${op.loaderLabel} + ${op.haulerLabel}`
+            ? op.sidebarBlurb
             : "Segera hadir"}
         </span>
       </span>
