@@ -245,12 +245,12 @@ export const OPERATIONS: OperationInfo[] = [
     description:
       "Satu tower crane (single server) melayani 1–5 front. Permintaan per front = proses Poisson (Exp). Service = 1 durasi mean+distribusi per front. Prioritas non-preemptive. Stop: waktu operasi (default 8 jam).",
     tasks: [
-      { key: "load", label: "Hook / sling" },
-      { key: "haul", label: "Hoist + swing" },
-      { key: "dump", label: "Lower + unhook" },
-      { key: "return", label: "Return empty" },
+      { key: "load", label: "Service crane" },
+      { key: "haul", label: "Inter-arrival request" },
+      { key: "dump", label: "—" },
+      { key: "return", label: "—" },
     ],
-    taskLabels: ["Hook", "Hoist+swing", "Lower+unhook", "Return empty"],
+    taskLabels: ["Service", "Request interval", "—", "—"],
     loaderLabel: "Tower crane",
     haulerLabel: "Work front",
     loaderCapacityLabel: "Kapasitas angkat (ton)",
@@ -281,15 +281,15 @@ export const OPERATIONS: OperationInfo[] = [
     },
     manual: {
       summary:
-        "Single-server multi-client: tower crane + N front. Antrian request diurut prioritas (1=tertinggi), lalu FIFO.",
+        "Single-server + Poisson: request Exp per front, service 1 dist per front, prioritas non-preemptive. Stop = waktu operasi.",
       howTo: [
-        "Aktifkan 1–5 front; set prioritas dan cycle time tiap front.",
-        "Set kapasitas angkat (ton); beban > kapasitas ditolak/retry.",
-        "Jalankan sim — lihat util crane, antrian, wait per front.",
-        "Front prioritas rendah menunggu lebih lama saat crane jenuh.",
+        "Aktifkan front, set prioritas dan mean inter-arrival (default Exp).",
+        "Set mean service per front (lokasi berbeda).",
+        "Jalankan shift 8 jam — lihat util crane, wait per front.",
+        "Front prio rendah menunggu lebih lama saat crane jenuh.",
       ],
       notes:
-        "Bottleneck tipikal = crane util tinggi + antrian lift. Naikkan prioritas front kritis atau kurangi frekuensi minta material.",
+        "Tidak ada hauler/excavator. KPI: util crane, lift, antrian request, wait per front.",
     },
     illustration: "/illustrations/tower-crane-multi-front.jpg",
     illustrationCaption:

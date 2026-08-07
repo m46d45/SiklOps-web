@@ -17,7 +17,7 @@ import {
   type DurationDist,
   type SimulationResult,
 } from "@/lib/simkon/engine";
-import { ResultsPanel } from "@/components/simkon/ResultsPanel";
+import { TowerCraneResults } from "@/components/simkon/TowerCraneResults";
 import { MetricCard } from "@/components/simkon/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -467,45 +467,7 @@ export function TowerCranePanel() {
         </CardContent>
       </Card>
 
-      {result?.front_stats ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Hasil per front</CardTitle>
-            <CardDescription>
-              Requests = jumlah permintaan Poisson. Lifts = terlayani. Wait tinggi pada prio
-              rendah = crane sibuk di front penting.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">Front</th>
-                  <th className="py-2 pr-3 font-medium">Prio</th>
-                  <th className="py-2 pr-3 font-medium">Requests</th>
-                  <th className="py-2 pr-3 font-medium">Lifts</th>
-                  <th className="py-2 pr-3 font-medium">Volume</th>
-                  <th className="py-2 font-medium">Wait avg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.front_stats.map((s) => (
-                  <tr key={s.id} className="border-b border-border/60">
-                    <td className="py-2 pr-3 font-medium">{s.name}</td>
-                    <td className="py-2 pr-3">{s.priority}</td>
-                    <td className="py-2 pr-3">{s.requests}</td>
-                    <td className="py-2 pr-3">{s.lifts}</td>
-                    <td className="py-2 pr-3">{formatNum(s.volume, 1)}</td>
-                    <td className="py-2">{formatNum(s.wait_avg, 1)} mnt</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {result ? <ResultsPanel result={result} /> : null}
+      {result ? <TowerCraneResults result={result} /> : null}
     </div>
   );
 }
