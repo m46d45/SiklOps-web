@@ -147,6 +147,19 @@ export function TowerCranePanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20">
+            <img
+              src="/illustrations/tower-crane-multi-front.jpg"
+              alt="Tower crane multi-front priority: yard to fronts via single server"
+              className="mx-auto max-h-64 w-full object-contain object-center p-2 sm:max-h-80"
+            />
+            <figcaption className="border-t border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+              <strong className="text-foreground">Yard</strong> →{" "}
+              <strong className="text-foreground">Tower crane (server)</strong> → Front
+              A/B/C. Antrian prioritas 1 dulu, lalu FIFO. Lift: hook→hoist→swing→lower→unhook→return
+              empty.
+            </figcaption>
+          </figure>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field
               label="Jumlah tower crane"

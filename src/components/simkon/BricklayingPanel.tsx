@@ -134,6 +134,19 @@ export function BricklayingPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20">
+            <img
+              src="/illustrations/bricklaying-cycle.jpg"
+              alt="Bricklaying triple-cycle: helper fetch, helper lift, tukang lay"
+              className="mx-auto max-h-64 w-full object-contain object-center p-2 sm:max-h-80"
+            />
+            <figcaption className="border-t border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
+              <strong className="text-foreground">A Fetch</strong> pile→temp ·{" "}
+              <strong className="text-foreground">B Lift</strong> temp→scaffold ·{" "}
+              <strong className="text-foreground">C Lay</strong> tukang pasang. Temp &
+              scaffold kapasitas terbatas.
+            </figcaption>
+          </figure>
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="rounded-[var(--radius-md)] border border-border bg-muted/20 p-3 text-xs leading-relaxed">
               <p className="font-medium text-foreground">A · Helper fetch</p>

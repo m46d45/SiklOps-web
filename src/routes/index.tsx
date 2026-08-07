@@ -260,10 +260,7 @@ function SiklOpsApp() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {operation.illustration &&
-              operation.id !== "concreting" &&
-              operation.id !== "bricklaying" &&
-              operation.id !== "tower_crane" ? (
+              {operation.illustration && operation.id !== "concreting" ? (
                 <figure className="mx-auto max-w-md overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20 sm:max-w-lg">
                   <img
                     src={operation.illustration}

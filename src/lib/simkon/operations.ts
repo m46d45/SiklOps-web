@@ -181,6 +181,8 @@ export const OPERATIONS: OperationInfo[] = [
         "Volume = m² dinding ekuivalen. Tanpa solar. Biaya = upah per jam.",
     },
     illustration: "/illustrations/bricklaying-cycle.jpg",
+    illustrationCaption:
+      "Triple-cycle: A Helper fetch → temp stock (limited) · B Helper lift → scaffold stock (limited space) · C Tukang lay.",
   },
   {
     id: "concreting",
@@ -289,6 +291,9 @@ export const OPERATIONS: OperationInfo[] = [
       notes:
         "Bottleneck tipikal = crane util tinggi + antrian lift. Naikkan prioritas front kritis atau kurangi frekuensi minta material.",
     },
+    illustration: "/illustrations/tower-crane-multi-front.jpg",
+    illustrationCaption:
+      "Single-server multi-front: yard → tower crane → Front A/B/C with priority queue (1 = highest).",
   },
 
 ];
