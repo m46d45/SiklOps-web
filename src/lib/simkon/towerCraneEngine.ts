@@ -83,7 +83,7 @@ export function defaultFronts(): CraneFront[] {
     {
       id: 2,
       name: "Front C · concrete bucket",
-      priority: 1,
+      priority: 3,
       volume_per_lift: 1.0,
       request_interval_mean: 8,
       service_mean: 9.2,
