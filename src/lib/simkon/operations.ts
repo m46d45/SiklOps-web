@@ -132,7 +132,7 @@ export const OPERATIONS: OperationInfo[] = [
     title: "Bricklaying (pasangan bata)",
     shortTitle: "Bricklaying",
     description:
-      "Triple-cycle: helper fetch bata ke temp stock (terbatas) → helper angkat ke scaffold stock (space terbatas) → tukang pasang. Helper satu pool untuk dua siklus supply.",
+      "Batch bricklaying: helper fetch pile jauh → temp (slot×batch) → lift batch ke scaffold (3 slot max) + ember mortar (3) → tukang pasang. Mortar team always-ready.",
     tasks: [
       { key: "load", label: "Helper fetch → temp" },
       { key: "haul", label: "Helper lift → scaffold" },
@@ -170,19 +170,19 @@ export const OPERATIONS: OperationInfo[] = [
     },
     manual: {
       summary:
-        "Tiga siklus: (A) helper ambil bata ke temp stock, (B) helper angkat ke scaffold, (C) tukang pasang. Temp & scaffold punya kapasitas terbatas — sumber antrian dan bottleneck.",
+        "Batch model: 1 trip helper = 1 batch bata (default 20). Scaffold 3 slot (max 60). Temp 10 slot (max 200). Threshold default 60 → fetch pile jauh. Mortar: 3 ember, 1 ember = 20 bata; tim mortar always-ready.",
       howTo: [
-        "Atur jumlah helper (pool A+B) dan tukang (C).",
-        "Batasi temp stock dan scaffold space — lihat efek pada util & antrian.",
-        "Bandingkan teori min(fetch, lift, lay) dengan throughput DES.",
-        "Naikkan helper jika tukang sering menunggu material scaffold.",
+        "Set batch_bricks, scaffold_slots, temp_slots, temp_refill_threshold.",
+        "Set mortar_buckets_max dan mortar_covers_bricks.",
+        "Helper pool mengerjakan fetch / lift bata / supply mortar.",
+        "Tukang butuh bata + mortar di scaffold sebelum pasang.",
       ],
       notes:
-        "Volume = m² dinding ekuivalen. Tanpa solar. Biaya = upah per jam.",
+        "Unload bata ke scaffold hanya jika ada slot kosong penuh 1 batch. Volume m² = bata / bricks_per_m2.",
     },
     illustration: "/illustrations/bricklaying-cycle.jpg",
     illustrationCaption:
-      "Triple-cycle: A Helper fetch bata+mortar → temp/mortar stock (limited) · B Helper lift ke scaffold · C Tukang lay.",
+      "A Fetch jauh (threshold) · Temp slot×batch · Scaffold 3 slot bata + 3 ember mortar · C Tukang lay.",
   },
   {
     id: "concreting",

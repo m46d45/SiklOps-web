@@ -1,12 +1,14 @@
 /**
- * Triple-cycle DES: Bricklaying
+ * Bricklaying DES — discrete batches + mortar
  *
- * Cycle A (Helper · fetch): pile → load bata → temp stock (ground buffer, limited)
- * Cycle B (Helper · lift):  temp stock → climb/carry → scaffold stock (limited space)
- * Cycle C (Tukang · lay):   scaffold stock → pasang bata → output m²
- *
- * Satu pool helper mengerjakan A dan B (prioritas jaga scaffold terisi).
- * Coupling: temp_buffer + scaffold_buffer (m² ekuivalen).
+ * Helper (pool) jobs:
+ *  A FETCH: jika temp stock ≤ threshold → ambil batch bata dari pile JAUIH (durasi fix lebih lama)
+ *           isi temp (slot × batch). Temp max = temp_slots × batch_bricks.
+ *  B LIFT bricks: bawa 1 batch (batch_bricks) ke scaffold HANYA jika ada slot kosong
+ *                 (scaffold max = scaffold_slots × batch). Tidak partial unload.
+ *  B' LIFT mortar: ambil ember mortar dari stasiun mortar (tim mortar selalu siap) ke scaffold.
+ *                  Scaffold mortar max = mortar_buckets. 1 ember = mortar_covers_bricks bata.
+ * Tukang C LAY: pasang bata; butuh 1 bata scaffold + mortar; output m² via bricks_per_m2.
  */
 
 import { Rng } from "./rng";
@@ -18,7 +20,7 @@ import {
   type ActivityLog,
   type DurationDist,
   sampleDuration,
-  resolveDist
+  resolveDist,
 } from "./engine";
 
 export function isBrickOperation(op: string | undefined): boolean {
@@ -28,65 +30,93 @@ export function isBrickOperation(op: string | undefined): boolean {
 export type BrickConfigFields = {
   num_helpers: number;
   num_masons: number;
-  /** muatan helper per trip fetch (m² ekuivalen) */
-  fetch_payload_m2: number;
-  /** muatan helper per trip ke scaffold */
-  lift_payload_m2: number;
-  /** output tukang per siklus pasang */
-  lay_payload_m2: number;
-  temp_buffer_m2: number;
-  scaffold_buffer_m2: number;
-  // Cycle A — helper fetch (menit)
-  fetch_travel_mean: number;
-  fetch_load_mean: number;
-  fetch_unload_mean: number;
-  fetch_return_mean: number;
-  // Cycle B — helper lift
+  /** Kapasitas angkat helper per trip (= 1 batch / 1 slot) */
+  batch_bricks: number;
+  /** Slot tumpukan di scaffold (default 3 → max 60 bila batch=20) */
+  scaffold_slots: number;
+  /** Slot di temp ground (default 10 → max 200) */
+  temp_slots: number;
+  /** Jika temp ≤ ini, fetch ke pile jauh (default 60) */
+  temp_refill_threshold: number;
+  /** Ember mortar di scaffold (default 3) */
+  mortar_buckets_max: number;
+  /** 1 ember mortar cukup untuk N bata (default 20) */
+  mortar_covers_bricks: number;
+  /** Bata per m² dinding (konversi hasil) */
+  bricks_per_m2: number;
+  /** Bata dipasang per siklus tukang */
+  lay_bricks_per_cycle: number;
+  // waktu (menit)
+  /** Fetch jauh: travel ke pile jauh (fix) */
+  far_travel_mean: number;
+  far_load_mean: number;
+  far_return_mean: number;
+  far_unload_mean: number;
+  /** Lift bata scaffold */
   lift_take_mean: number;
   lift_climb_mean: number;
   lift_unload_mean: number;
   lift_return_mean: number;
-  // Cycle C — mason lay
+  /** Supply mortar ke scaffold */
+  mortar_take_mean: number;
+  mortar_climb_mean: number;
+  mortar_place_mean: number;
+  mortar_return_mean: number;
+  /** Tukang lay */
   lay_take_mean: number;
   lay_place_mean: number;
   lay_finish_mean: number;
-  // optional dists
-  fetch_travel_dist?: DurationDist | null;
-  fetch_load_dist?: DurationDist | null;
-  fetch_unload_dist?: DurationDist | null;
-  fetch_return_dist?: DurationDist | null;
+  // dists optional
+  far_travel_dist?: DurationDist | null;
+  far_load_dist?: DurationDist | null;
+  far_return_dist?: DurationDist | null;
+  far_unload_dist?: DurationDist | null;
   lift_take_dist?: DurationDist | null;
   lift_climb_dist?: DurationDist | null;
   lift_unload_dist?: DurationDist | null;
   lift_return_dist?: DurationDist | null;
+  mortar_take_dist?: DurationDist | null;
+  mortar_climb_dist?: DurationDist | null;
+  mortar_place_dist?: DurationDist | null;
+  mortar_return_dist?: DurationDist | null;
   lay_take_dist?: DurationDist | null;
   lay_place_dist?: DurationDist | null;
   lay_finish_dist?: DurationDist | null;
+  // legacy aliases kept for applyBrick mapping
+  fetch_payload_m2?: number;
+  lift_payload_m2?: number;
+  lay_payload_m2?: number;
+  temp_buffer_m2?: number;
+  scaffold_buffer_m2?: number;
 };
 
 export function brickDefaults(): BrickConfigFields {
   return {
     num_helpers: 3,
     num_masons: 2,
-    fetch_payload_m2: 0.5,
-    lift_payload_m2: 0.35,
-    lay_payload_m2: 0.25,
-    temp_buffer_m2: 2.5,
-    scaffold_buffer_m2: 0.9,
-    // A fetch ~ 6.5 mnt
-    fetch_travel_mean: 1.5,
-    fetch_load_mean: 1.2,
-    fetch_unload_mean: 0.8,
-    fetch_return_mean: 1.2,
-    // B lift ~ 7 mnt (naik scaffolding lebih lama)
-    lift_take_mean: 0.8,
-    lift_climb_mean: 2.5,
+    batch_bricks: 20,
+    scaffold_slots: 3,
+    temp_slots: 10,
+    temp_refill_threshold: 60,
+    mortar_buckets_max: 3,
+    mortar_covers_bricks: 20,
+    bricks_per_m2: 50,
+    lay_bricks_per_cycle: 1,
+    far_travel_mean: 3.0,
+    far_load_mean: 1.5,
+    far_return_mean: 3.0,
+    far_unload_mean: 1.0,
+    lift_take_mean: 0.6,
+    lift_climb_mean: 2.2,
     lift_unload_mean: 0.8,
-    lift_return_mean: 2.0,
-    // C lay ~ 4 mnt
-    lay_take_mean: 0.4,
-    lay_place_mean: 2.8,
-    lay_finish_mean: 0.5,
+    lift_return_mean: 1.8,
+    mortar_take_mean: 0.5,
+    mortar_climb_mean: 2.0,
+    mortar_place_mean: 0.6,
+    mortar_return_mean: 1.6,
+    lay_take_mean: 0.15,
+    lay_place_mean: 0.9,
+    lay_finish_mean: 0.15,
   };
 }
 
@@ -96,78 +126,77 @@ export function readBrickFields(cfg: SimulationConfig): BrickConfigFields {
   return {
     num_helpers: Math.max(1, Math.floor(c.num_helpers ?? cfg.num_haulers ?? d.num_helpers)),
     num_masons: Math.max(1, Math.floor(c.num_masons ?? cfg.num_loaders ?? d.num_masons)),
-    fetch_payload_m2: Math.max(0.05, c.fetch_payload_m2 ?? d.fetch_payload_m2),
-    lift_payload_m2: Math.max(0.05, c.lift_payload_m2 ?? d.lift_payload_m2),
-    lay_payload_m2: Math.max(0.05, c.lay_payload_m2 ?? cfg.payload_per_trip ?? d.lay_payload_m2),
-    temp_buffer_m2: Math.max(0.2, c.temp_buffer_m2 ?? d.temp_buffer_m2),
-    scaffold_buffer_m2: Math.max(0.15, c.scaffold_buffer_m2 ?? d.scaffold_buffer_m2),
-    fetch_travel_mean: Math.max(0.1, c.fetch_travel_mean ?? d.fetch_travel_mean),
-    fetch_load_mean: Math.max(0.1, c.fetch_load_mean ?? d.fetch_load_mean),
-    fetch_unload_mean: Math.max(0.1, c.fetch_unload_mean ?? d.fetch_unload_mean),
-    fetch_return_mean: Math.max(0.1, c.fetch_return_mean ?? d.fetch_return_mean),
+    batch_bricks: Math.max(1, Math.floor(c.batch_bricks ?? d.batch_bricks)),
+    scaffold_slots: Math.max(1, Math.floor(c.scaffold_slots ?? d.scaffold_slots)),
+    temp_slots: Math.max(1, Math.floor(c.temp_slots ?? d.temp_slots)),
+    temp_refill_threshold: Math.max(
+      0,
+      Math.floor(c.temp_refill_threshold ?? d.temp_refill_threshold),
+    ),
+    mortar_buckets_max: Math.max(1, Math.floor(c.mortar_buckets_max ?? d.mortar_buckets_max)),
+    mortar_covers_bricks: Math.max(
+      1,
+      Math.floor(c.mortar_covers_bricks ?? d.mortar_covers_bricks),
+    ),
+    bricks_per_m2: Math.max(10, c.bricks_per_m2 ?? d.bricks_per_m2),
+    lay_bricks_per_cycle: Math.max(1, Math.floor(c.lay_bricks_per_cycle ?? d.lay_bricks_per_cycle)),
+    far_travel_mean: Math.max(0.1, c.far_travel_mean ?? d.far_travel_mean),
+    far_load_mean: Math.max(0.1, c.far_load_mean ?? d.far_load_mean),
+    far_return_mean: Math.max(0.1, c.far_return_mean ?? d.far_return_mean),
+    far_unload_mean: Math.max(0.1, c.far_unload_mean ?? d.far_unload_mean),
     lift_take_mean: Math.max(0.1, c.lift_take_mean ?? d.lift_take_mean),
     lift_climb_mean: Math.max(0.1, c.lift_climb_mean ?? d.lift_climb_mean),
     lift_unload_mean: Math.max(0.1, c.lift_unload_mean ?? d.lift_unload_mean),
     lift_return_mean: Math.max(0.1, c.lift_return_mean ?? d.lift_return_mean),
-    lay_take_mean: Math.max(0.1, c.lay_take_mean ?? d.lay_take_mean),
-    lay_place_mean: Math.max(0.1, c.lay_place_mean ?? cfg.load_time_mean ?? d.lay_place_mean),
-    lay_finish_mean: Math.max(0.1, c.lay_finish_mean ?? d.lay_finish_mean),
-    fetch_travel_dist: c.fetch_travel_dist ?? null,
-    fetch_load_dist: c.fetch_load_dist ?? null,
-    fetch_unload_dist: c.fetch_unload_dist ?? null,
-    fetch_return_dist: c.fetch_return_dist ?? null,
+    mortar_take_mean: Math.max(0.1, c.mortar_take_mean ?? d.mortar_take_mean),
+    mortar_climb_mean: Math.max(0.1, c.mortar_climb_mean ?? d.mortar_climb_mean),
+    mortar_place_mean: Math.max(0.1, c.mortar_place_mean ?? d.mortar_place_mean),
+    mortar_return_mean: Math.max(0.1, c.mortar_return_mean ?? d.mortar_return_mean),
+    lay_take_mean: Math.max(0.05, c.lay_take_mean ?? d.lay_take_mean),
+    lay_place_mean: Math.max(0.05, c.lay_place_mean ?? d.lay_place_mean),
+    lay_finish_mean: Math.max(0.05, c.lay_finish_mean ?? d.lay_finish_mean),
+    far_travel_dist: c.far_travel_dist ?? null,
+    far_load_dist: c.far_load_dist ?? null,
+    far_return_dist: c.far_return_dist ?? null,
+    far_unload_dist: c.far_unload_dist ?? null,
     lift_take_dist: c.lift_take_dist ?? null,
     lift_climb_dist: c.lift_climb_dist ?? null,
     lift_unload_dist: c.lift_unload_dist ?? null,
     lift_return_dist: c.lift_return_dist ?? null,
+    mortar_take_dist: c.mortar_take_dist ?? null,
+    mortar_climb_dist: c.mortar_climb_dist ?? null,
+    mortar_place_dist: c.mortar_place_dist ?? null,
+    mortar_return_dist: c.mortar_return_dist ?? null,
     lay_take_dist: c.lay_take_dist ?? null,
     lay_place_dist: c.lay_place_dist ?? null,
     lay_finish_dist: c.lay_finish_dist ?? null,
   };
 }
 
-/** Map brick triple-cycle → shared loader/hauler fields for costs & ResultsPanel */
 export function applyBrickToConfig(
   base: SimulationConfig,
   fields?: Partial<BrickConfigFields>,
 ): SimulationConfig {
   const f = { ...readBrickFields(base), ...fields };
+  const layM2 = f.lay_bricks_per_cycle / f.bricks_per_m2;
+  const liftM2 = f.batch_bricks / f.bricks_per_m2;
   return {
     ...base,
     operation: "bricklaying",
+    ...f,
     num_loaders: f.num_masons,
     num_haulers: f.num_helpers,
-    num_masons: f.num_masons,
-    num_helpers: f.num_helpers,
-    loader_bucket_m3: f.lay_payload_m2,
-    hauler_capacity_m3: f.lift_payload_m2,
-    payload_per_trip: f.lay_payload_m2,
+    loader_bucket_m3: layM2,
+    hauler_capacity_m3: liftM2,
+    payload_per_trip: layM2,
     load_time_mean: f.lay_place_mean,
     haul_time_mean: f.lift_climb_mean,
     dump_time_mean: f.lay_finish_mean,
     return_time_mean: f.lay_take_mean,
-    load_dist: fromMeanCv(f.lay_place_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    haul_dist: fromMeanCv(f.lift_climb_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    dump_dist: fromMeanCv(f.lay_finish_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    return_dist: fromMeanCv(f.lay_take_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    // brick fields
-    fetch_payload_m2: f.fetch_payload_m2,
-    lift_payload_m2: f.lift_payload_m2,
-    lay_payload_m2: f.lay_payload_m2,
-    temp_buffer_m2: f.temp_buffer_m2,
-    scaffold_buffer_m2: f.scaffold_buffer_m2,
-    fetch_travel_mean: f.fetch_travel_mean,
-    fetch_load_mean: f.fetch_load_mean,
-    fetch_unload_mean: f.fetch_unload_mean,
-    fetch_return_mean: f.fetch_return_mean,
-    lift_take_mean: f.lift_take_mean,
-    lift_climb_mean: f.lift_climb_mean,
-    lift_unload_mean: f.lift_unload_mean,
-    lift_return_mean: f.lift_return_mean,
-    lay_take_mean: f.lay_take_mean,
-    lay_place_mean: f.lay_place_mean,
-    lay_finish_mean: f.lay_finish_mean,
-    // keep costs from base (tukang=loader, helper=hauler)
+    load_dist: fromMeanCv(f.lay_place_mean, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
+    haul_dist: fromMeanCv(f.lift_climb_mean, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
+    dump_dist: fromMeanCv(f.lay_finish_mean, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
+    return_dist: fromMeanCv(f.lay_take_mean, base.cv ?? 0.15, base.default_dist_kind ?? "normal"),
     cost_loader_per_hour: base.cost_loader_per_hour || 75_000,
     cost_hauler_per_hour: base.cost_hauler_per_hour || 50_000,
     fuel_loader_work_lph: 0,
@@ -181,31 +210,35 @@ export function applyBrickToConfig(
   } as SimulationConfig;
 }
 
+type Job = "fetch" | "lift" | "mortar" | null;
 type EvKind =
   | "helper_free"
   | "fetch_travel_done"
   | "fetch_load_done"
-  | "fetch_unload_done"
   | "fetch_return_done"
+  | "fetch_unload_done"
   | "lift_take_done"
   | "lift_climb_done"
   | "lift_unload_done"
   | "lift_return_done"
+  | "mortar_take_done"
+  | "mortar_climb_done"
+  | "mortar_place_done"
+  | "mortar_return_done"
   | "mason_free"
   | "lay_take_done"
   | "lay_place_done"
   | "lay_finish_done";
 
-type Ev = { t: number; kind: EvKind; id: number; seq: number; vol?: number };
+type Ev = { t: number; kind: EvKind; id: number; seq: number; n?: number };
 
-function samplePhase(
+function sample(
   rng: Rng,
   config: SimulationConfig,
   mean: number,
   dist?: DurationDist | null,
 ): number {
-  const resolved = resolveDist(config, dist ?? null, mean);
-  return sampleDuration(resolved, rng);
+  return sampleDuration(resolveDist(config, dist ?? null, mean), rng);
 }
 
 export function runBrickTripleSimulation(configIn: SimulationConfig): SimulationResult {
@@ -217,14 +250,27 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
   let targetCycles = Math.max(0, Math.floor(config.target_cycles || 0));
   let targetVolume = Math.max(0, Number(config.target_volume) || 0);
   if (targetCycles <= 0 && targetVolume <= 0) {
-    targetCycles = 40;
-    targetVolume = 20;
+    targetCycles = 200;
+    targetVolume = 10;
   }
+
+  const batch = f.batch_bricks;
+  const tempMax = f.temp_slots * batch;
+  const scafMax = f.scaffold_slots * batch;
+  const mortarMax = f.mortar_buckets_max;
+  const mortarCap = f.mortar_covers_bricks; // bricks per bucket
+  const layN = f.lay_bricks_per_cycle;
+  const bpm2 = f.bricks_per_m2;
 
   const nH = f.num_helpers;
   const nM = f.num_masons;
-  const tempMax = Math.max(f.fetch_payload_m2, f.temp_buffer_m2);
-  const scafMax = Math.max(f.lift_payload_m2, f.scaffold_buffer_m2);
+
+  // stocks (discrete)
+  let tempBricks = tempMax; // start full
+  let scafBricks = 0;
+  /** mortar remaining in bricks-equivalent on scaffold */
+  let scafMortarBricks = 0;
+  let scafBuckets = 0;
 
   const events: Ev[] = [];
   let seq = 0;
@@ -234,41 +280,34 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
     events.sort((a, b) => a.t - b.t || a.seq - b.seq);
   };
 
-  let temp = 0;
-  let scaffold = 0;
-
   const helperBusy: boolean[] = Array(nH).fill(false);
   const masonBusy: boolean[] = Array(nM).fill(false);
-  // helper carrying volume mid-cycle
-  const helperVol: number[] = Array(nH).fill(0);
-  const helperJob: ("fetch" | "lift" | null)[] = Array(nH).fill(null);
-
+  const helperJob: Job[] = Array(nH).fill(null);
   const helperBusyInt: [number, number][][] = Array.from({ length: nH }, () => []);
   const masonBusyInt: [number, number][][] = Array.from({ length: nM }, () => []);
-  const helperWaitInt: [number, number][][] = Array.from({ length: nH }, () => []);
   const masonWaitInt: [number, number][][] = Array.from({ length: nM }, () => []);
+  const helperWaitInt: [number, number][][] = Array.from({ length: nH }, () => []);
+  const masonWaitStart: number[] = Array(nM).fill(-1);
 
   const waitSamples: number[] = [];
   const arrivalTimes: number[] = [];
   const serviceTimes: number[] = [];
   let totalTrips = 0;
+  let totalBricks = 0;
   let totalVolume = 0;
   let stopReason = "duration";
   let endTime = maxHorizon;
   let reached = false;
+  let masonsWaiting = 0;
 
   const timelineVolume: [number, number][] = [[0, 0]];
   const queueOverTime: [number, number][] = [[0, 0]];
   const activityLog: ActivityLog[] = [];
   const cycleLog: CycleLog[] = [];
 
-  // queue proxy: masons waiting for scaffold material
-  let masonsWaiting = 0;
-  let lastQ = 0;
+  let lastChange = 0;
   let qIntegral = 0;
   let maxQueue = 0;
-  let lastChange = 0;
-  const masonWaitStart: number[] = Array(nM).fill(-1);
 
   const integrateQ = (t: number) => {
     t = Math.min(t, maxHorizon);
@@ -284,55 +323,62 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
       queueOverTime.push([Math.min(t, maxHorizon), masonsWaiting]);
     }
   };
-
+  const markBusy = (ints: [number, number][][], id: number, start: number, dur: number) => {
+    const s = Math.max(0, start);
+    const e = Math.min(maxHorizon, start + dur);
+    if (e > s) ints[id].push([s, e]);
+  };
   const recAct = (hid: number, phase: string, start: number, dur: number) => {
     const s = Math.max(0, start);
     const e = Math.min(maxHorizon, start + dur);
     if (e > s) activityLog.push({ hauler_id: hid, phase, start: s, end: e, duration: e - s });
   };
 
-  const markBusy = (intervals: [number, number][][], id: number, start: number, dur: number) => {
-    const s = Math.max(0, start);
-    const e = Math.min(maxHorizon, start + dur);
-    if (e > s) intervals[id].push([s, e]);
-  };
+  const freeScafSlots = () => Math.floor((scafMax - scafBricks) / batch);
+  const freeTempSlots = () => Math.floor((tempMax - tempBricks) / batch);
+  const needFetch = () =>
+    tempBricks <= f.temp_refill_threshold && freeTempSlots() > 0;
+  const canLiftBrick = () => tempBricks >= batch && freeScafSlots() > 0;
+  const canLiftMortar = () => scafBuckets < mortarMax;
+  const canLay = () => scafBricks >= layN && scafMortarBricks >= layN;
 
   const tryStartHelpers = (now: number) => {
     if (reached) return;
-    // Priority: keep scaffold fed (B), else fetch to temp (A)
     for (let id = 0; id < nH; id++) {
       if (helperBusy[id]) continue;
 
-      const canLift =
-        temp + 1e-9 >= f.lift_payload_m2 &&
-        scaffold + f.lift_payload_m2 <= scafMax + 1e-9;
-      const canFetch = temp + f.fetch_payload_m2 <= tempMax + 1e-9;
-
-      // Prefer lift if scaffold below half OR temp almost full
-      const scaffoldLow = scaffold < scafMax * 0.45;
-      const tempHigh = temp > tempMax * 0.7;
-      let job: "lift" | "fetch" | null = null;
-      if (canLift && (scaffoldLow || tempHigh || !canFetch)) job = "lift";
-      else if (canFetch) job = "fetch";
-      else if (canLift) job = "lift";
+      // Prioritas: (1) mortar jika scaffold hampir kosong mortar
+      // (2) lift bata jika slot kosong
+      // (3) fetch jauh jika temp ≤ threshold
+      const mortarLow = scafMortarBricks < layN * nM || scafBuckets < 1;
+      let job: Job = null;
+      if (mortarLow && canLiftMortar()) job = "mortar";
+      else if (canLiftBrick()) job = "lift";
+      else if (needFetch()) job = "fetch";
+      else if (canLiftMortar() && scafBuckets < mortarMax) job = "mortar";
+      else if (canLiftBrick()) job = "lift";
       if (!job) continue;
 
       helperBusy[id] = true;
       helperJob[id] = job;
+
       if (job === "fetch") {
-        helperVol[id] = f.fetch_payload_m2;
-        const d = samplePhase(rng, config, f.fetch_travel_mean, f.fetch_travel_dist);
+        const d = sample(rng, config, f.far_travel_mean, f.far_travel_dist);
         markBusy(helperBusyInt, id, now, d);
-        recAct(id, "fetch_travel", now, d);
+        recAct(id, "fetch_far_travel", now, d);
         push({ t: now + d, kind: "fetch_travel_done", id });
-      } else {
-        // reserve from temp immediately
-        temp = Math.max(0, temp - f.lift_payload_m2);
-        helperVol[id] = f.lift_payload_m2;
-        const d = samplePhase(rng, config, f.lift_take_mean, f.lift_take_dist);
+      } else if (job === "lift") {
+        tempBricks -= batch; // reserve batch from temp
+        const d = sample(rng, config, f.lift_take_mean, f.lift_take_dist);
         markBusy(helperBusyInt, id, now, d);
         recAct(id, "lift_take", now, d);
-        push({ t: now + d, kind: "lift_take_done", id });
+        push({ t: now + d, kind: "lift_take_done", id, n: batch });
+      } else {
+        // mortar — ground unlimited
+        const d = sample(rng, config, f.mortar_take_mean, f.mortar_take_dist);
+        markBusy(helperBusyInt, id, now, d);
+        recAct(id, "mortar_take", now, d);
+        push({ t: now + d, kind: "mortar_take_done", id, n: 1 });
       }
     }
   };
@@ -341,19 +387,15 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
     if (reached) return;
     for (let id = 0; id < nM; id++) {
       if (masonBusy[id]) continue;
-      if (scaffold + 1e-9 < f.lay_payload_m2) {
-        // waiting for material
+      if (!canLay()) {
         if (masonWaitStart[id] < 0) {
           masonWaitStart[id] = now;
           masonsWaiting += 1;
           integrateQ(now);
           snapQ(now);
-          helperWaitInt; // silence
-          markBusy(masonWaitInt, id, now, 0); // open wait marker handled below
         }
         continue;
       }
-      // start lay — consume scaffold
       if (masonWaitStart[id] >= 0) {
         const w = Math.max(0, now - masonWaitStart[id]);
         waitSamples.push(w);
@@ -363,22 +405,26 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
         integrateQ(now);
         snapQ(now);
       }
-      scaffold = Math.max(0, scaffold - f.lay_payload_m2);
+      // consume resources at start of lay
+      scafBricks -= layN;
+      scafMortarBricks -= layN;
+      // free bucket slots when mortar fully used
+      scafBuckets = Math.min(mortarMax, Math.ceil(scafMortarBricks / mortarCap));
+
       masonBusy[id] = true;
       arrivalTimes.push(now);
-      const d = samplePhase(rng, config, f.lay_take_mean, f.lay_take_dist);
+      const d = sample(rng, config, f.lay_take_mean, f.lay_take_dist);
       markBusy(masonBusyInt, id, now, d);
       recAct(1000 + id, "lay_take", now, d);
-      push({ t: now + d, kind: "lay_take_done", id, vol: f.lay_payload_m2 });
+      push({ t: now + d, kind: "lay_take_done", id, n: layN });
     }
   };
 
-  // bootstrap: all free at t=0
   for (let id = 0; id < nH; id++) push({ t: 0, kind: "helper_free", id });
   for (let id = 0; id < nM; id++) push({ t: 0, kind: "mason_free", id });
 
   let safety = 0;
-  while (events.length > 0 && safety < 2_000_000) {
+  while (events.length > 0 && safety < 3_000_000) {
     safety += 1;
     const ev = events.shift()!;
     const now = ev.t;
@@ -393,54 +439,35 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
         break;
 
       case "fetch_travel_done": {
-        const d = samplePhase(rng, config, f.fetch_load_mean, f.fetch_load_dist);
+        const d = sample(rng, config, f.far_load_mean, f.far_load_dist);
         markBusy(helperBusyInt, ev.id, now, d);
-        recAct(ev.id, "fetch_load", now, d);
-        push({ t: now + d, kind: "fetch_load_done", id: ev.id });
+        recAct(ev.id, "fetch_far_load", now, d);
+        push({ t: now + d, kind: "fetch_load_done", id: ev.id, n: batch });
         break;
       }
       case "fetch_load_done": {
-        // travel back to temp
-        const d = samplePhase(rng, config, f.fetch_travel_mean * 0.85, f.fetch_travel_dist);
+        const d = sample(rng, config, f.far_return_mean, f.far_return_dist);
         markBusy(helperBusyInt, ev.id, now, d);
-        recAct(ev.id, "fetch_haul_temp", now, d);
-        push({ t: now + d, kind: "fetch_unload_done", id: ev.id });
-        break;
-      }
-      case "fetch_unload_done": {
-        // may wait if temp full (shouldn't reserve yet)
-        const vol = helperVol[ev.id];
-        if (temp + vol > tempMax + 1e-9) {
-          // brief wait then retry unload
-          const wait = 0.25;
-          markBusy(helperWaitInt, ev.id, now, wait);
-          push({ t: now + wait, kind: "fetch_unload_done", id: ev.id });
-          break;
-        }
-        const d = samplePhase(rng, config, f.fetch_unload_mean, f.fetch_unload_dist);
-        markBusy(helperBusyInt, ev.id, now, d);
-        recAct(ev.id, "fetch_unload", now, d);
-        // complete unload at end of unload — schedule return after adding buffer
-        push({ t: now + d, kind: "fetch_return_done", id: ev.id, vol });
-        // add to temp when unload finishes (at now+d handled in return_done start)
-        // Actually add now after unload duration via return_done carrying vol
+        recAct(ev.id, "fetch_far_return", now, d);
+        push({ t: now + d, kind: "fetch_return_done", id: ev.id, n: batch });
         break;
       }
       case "fetch_return_done": {
-        if (ev.vol != null && ev.vol > 0 && helperJob[ev.id] === "fetch") {
-          // first arrival to this kind after unload: deposit then return travel
-          if (helperVol[ev.id] > 0) {
-            temp = Math.min(tempMax, temp + helperVol[ev.id]);
-            helperVol[ev.id] = 0;
-            const d = samplePhase(rng, config, f.fetch_return_mean, f.fetch_return_dist);
-            markBusy(helperBusyInt, ev.id, now, d);
-            recAct(ev.id, "fetch_return", now, d);
-            push({ t: now + d, kind: "helper_free", id: ev.id });
-            tryStartHelpers(now);
-            tryStartMasons(now);
-            break;
-          }
+        // wait if no free temp slot
+        if (freeTempSlots() <= 0) {
+          const wait = 0.3;
+          markBusy(helperWaitInt, ev.id, now, wait);
+          push({ t: now + wait, kind: "fetch_return_done", id: ev.id, n: batch });
+          break;
         }
+        const d = sample(rng, config, f.far_unload_mean, f.far_unload_dist);
+        markBusy(helperBusyInt, ev.id, now, d);
+        recAct(ev.id, "fetch_unload_temp", now, d);
+        push({ t: now + d, kind: "fetch_unload_done", id: ev.id, n: batch });
+        break;
+      }
+      case "fetch_unload_done": {
+        tempBricks = Math.min(tempMax, tempBricks + (ev.n ?? batch));
         helperBusy[ev.id] = false;
         helperJob[ev.id] = null;
         tryStartHelpers(now);
@@ -449,45 +476,78 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
       }
 
       case "lift_take_done": {
-        const d = samplePhase(rng, config, f.lift_climb_mean, f.lift_climb_dist);
+        const d = sample(rng, config, f.lift_climb_mean, f.lift_climb_dist);
         markBusy(helperBusyInt, ev.id, now, d);
         recAct(ev.id, "lift_climb", now, d);
-        push({ t: now + d, kind: "lift_climb_done", id: ev.id });
+        push({ t: now + d, kind: "lift_climb_done", id: ev.id, n: ev.n });
         break;
       }
       case "lift_climb_done": {
-        const vol = helperVol[ev.id];
-        if (scaffold + vol > scafMax + 1e-9) {
-          const wait = 0.25;
+        // only unload if a full slot is free; else wait on scaffold
+        if (freeScafSlots() <= 0) {
+          const wait = 0.3;
           markBusy(helperWaitInt, ev.id, now, wait);
-          push({ t: now + wait, kind: "lift_climb_done", id: ev.id });
+          push({ t: now + wait, kind: "lift_climb_done", id: ev.id, n: ev.n });
           break;
         }
-        const d = samplePhase(rng, config, f.lift_unload_mean, f.lift_unload_dist);
+        const d = sample(rng, config, f.lift_unload_mean, f.lift_unload_dist);
         markBusy(helperBusyInt, ev.id, now, d);
         recAct(ev.id, "lift_unload", now, d);
-        push({ t: now + d, kind: "lift_unload_done", id: ev.id, vol });
+        push({ t: now + d, kind: "lift_unload_done", id: ev.id, n: ev.n });
         break;
       }
       case "lift_unload_done": {
-        if (ev.vol != null) {
-          scaffold = Math.min(scafMax, scaffold + ev.vol);
-          helperVol[ev.id] = 0;
-        }
-        const d = samplePhase(rng, config, f.lift_return_mean, f.lift_return_dist);
+        scafBricks = Math.min(scafMax, scafBricks + (ev.n ?? batch));
+        const d = sample(rng, config, f.lift_return_mean, f.lift_return_dist);
         markBusy(helperBusyInt, ev.id, now, d);
         recAct(ev.id, "lift_return", now, d);
         push({ t: now + d, kind: "lift_return_done", id: ev.id });
         tryStartMasons(now);
         break;
       }
-      case "lift_return_done": {
+      case "lift_return_done":
         helperBusy[ev.id] = false;
         helperJob[ev.id] = null;
         tryStartHelpers(now);
         tryStartMasons(now);
         break;
+
+      case "mortar_take_done": {
+        const d = sample(rng, config, f.mortar_climb_mean, f.mortar_climb_dist);
+        markBusy(helperBusyInt, ev.id, now, d);
+        recAct(ev.id, "mortar_climb", now, d);
+        push({ t: now + d, kind: "mortar_climb_done", id: ev.id, n: 1 });
+        break;
       }
+      case "mortar_climb_done": {
+        if (scafBuckets >= mortarMax) {
+          const wait = 0.3;
+          markBusy(helperWaitInt, ev.id, now, wait);
+          push({ t: now + wait, kind: "mortar_climb_done", id: ev.id, n: 1 });
+          break;
+        }
+        const d = sample(rng, config, f.mortar_place_mean, f.mortar_place_dist);
+        markBusy(helperBusyInt, ev.id, now, d);
+        recAct(ev.id, "mortar_place", now, d);
+        push({ t: now + d, kind: "mortar_place_done", id: ev.id, n: 1 });
+        break;
+      }
+      case "mortar_place_done": {
+        scafBuckets = Math.min(mortarMax, scafBuckets + 1);
+        scafMortarBricks = Math.min(mortarMax * mortarCap, scafMortarBricks + mortarCap);
+        const d = sample(rng, config, f.mortar_return_mean, f.mortar_return_dist);
+        markBusy(helperBusyInt, ev.id, now, d);
+        recAct(ev.id, "mortar_return", now, d);
+        push({ t: now + d, kind: "mortar_return_done", id: ev.id });
+        tryStartMasons(now);
+        break;
+      }
+      case "mortar_return_done":
+        helperBusy[ev.id] = false;
+        helperJob[ev.id] = null;
+        tryStartHelpers(now);
+        tryStartMasons(now);
+        break;
 
       case "mason_free":
         masonBusy[ev.id] = false;
@@ -496,67 +556,66 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
         break;
 
       case "lay_take_done": {
-        const d = samplePhase(rng, config, f.lay_place_mean, f.lay_place_dist);
+        const d = sample(rng, config, f.lay_place_mean, f.lay_place_dist);
         markBusy(masonBusyInt, ev.id, now, d);
         recAct(1000 + ev.id, "lay_place", now, d);
         serviceTimes.push(d);
-        push({ t: now + d, kind: "lay_place_done", id: ev.id, vol: f.lay_payload_m2 });
+        push({ t: now + d, kind: "lay_place_done", id: ev.id, n: ev.n });
         break;
       }
       case "lay_place_done": {
-        const d = samplePhase(rng, config, f.lay_finish_mean, f.lay_finish_dist);
+        const d = sample(rng, config, f.lay_finish_mean, f.lay_finish_dist);
         markBusy(masonBusyInt, ev.id, now, d);
         recAct(1000 + ev.id, "lay_finish", now, d);
-        push({ t: now + d, kind: "lay_finish_done", id: ev.id, vol: ev.vol });
+        push({ t: now + d, kind: "lay_finish_done", id: ev.id, n: ev.n });
         break;
       }
       case "lay_finish_done": {
-        const vol = ev.vol ?? f.lay_payload_m2;
+        const bricks = ev.n ?? layN;
+        const vol = bricks / bpm2;
         totalTrips += 1;
+        totalBricks += bricks;
         totalVolume += vol;
         timelineVolume.push([now, totalVolume]);
-        const placeDur = f.lay_place_mean;
+        const cyc = f.lay_take_mean + f.lay_place_mean + f.lay_finish_mean;
         cycleLog.push({
           hauler_id: 1000 + ev.id,
           trip: totalTrips,
           wait: 0,
           load: f.lay_take_mean,
-          haul: placeDur,
+          haul: f.lay_place_mean,
           dump: f.lay_finish_mean,
           return: 0,
-          cycle_time: f.lay_take_mean + placeDur + f.lay_finish_mean,
-          productive_time: f.lay_take_mean + placeDur + f.lay_finish_mean,
+          cycle_time: cyc,
+          productive_time: cyc,
           finish_time: now,
           return_finish: now,
           volume: vol,
-          productivity: vol > 0 ? vol / Math.max(1e-9, (f.lay_take_mean + placeDur + f.lay_finish_mean) / 60) : 0,
+          productivity: vol > 0 ? vol / Math.max(1e-9, cyc / 60) : 0,
         });
 
         if (!reached) {
           const hitC = targetCycles > 0 && totalTrips >= targetCycles;
           const hitV = targetVolume > 0 && totalVolume >= targetVolume - 1e-9;
+          const mode = config.stop_mode ?? "either";
           if (hitC && hitV) {
             reached = true;
             stopReason = "target_both";
             endTime = now;
-          } else if (hitC && targetVolume <= 0) {
+          } else if (mode === "either" && (hitC || hitV)) {
+            reached = true;
+            stopReason = hitC ? "target_cycles" : "target_volume";
+            endTime = now;
+          } else if (mode === "cycles" && hitC) {
             reached = true;
             stopReason = "target_cycles";
             endTime = now;
-          } else if (hitV && targetCycles <= 0) {
+          } else if (mode === "volume" && hitV) {
             reached = true;
             stopReason = "target_volume";
             endTime = now;
-          } else if (hitC || hitV) {
-            // either mode default
-            if ((config.stop_mode ?? "either") === "either") {
-              reached = true;
-              stopReason = hitC ? "target_cycles" : "target_volume";
-              endTime = now;
-            }
           }
         }
-
         masonBusy[ev.id] = false;
         if (!reached) {
           tryStartMasons(now);
@@ -565,7 +624,6 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
         break;
       }
     }
-
     if (reached) break;
   }
 
@@ -579,52 +637,40 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
   const horizon = Math.max(endTime, 1e-9);
   const sumBusy = (ints: [number, number][][]) =>
     ints.reduce(
-      (s, rows) => s + rows.reduce((a, [x, y]) => a + Math.max(0, Math.min(y, horizon) - Math.max(x, 0)), 0),
+      (s, rows) =>
+        s + rows.reduce((a, [x, y]) => a + Math.max(0, Math.min(y, horizon) - Math.max(x, 0)), 0),
       0,
     );
   const masonBusyMin = sumBusy(masonBusyInt);
   const helperBusyMin = sumBusy(helperBusyInt);
   const masonWaitMin = sumBusy(masonWaitInt);
   const helperWaitMin = sumBusy(helperWaitInt);
-
   const loaderUtil = Math.min(1, masonBusyMin / (nM * horizon));
   const haulerUtil = Math.min(1, helperBusyMin / (nH * horizon));
-  const avgWait = waitSamples.length ? waitSamples.reduce((a, b) => a + b, 0) / waitSamples.length : 0;
+  const avgWait = waitSamples.length
+    ? waitSamples.reduce((a, b) => a + b, 0) / waitSamples.length
+    : 0;
   const avgQ = qIntegral / horizon;
   const throughput = (totalVolume / horizon) * 60;
 
-  // avg cycle components from mason lay
-  const avg_cycle_components: Record<string, number> = {
-    wait: avgWait,
-    load: f.lay_take_mean,
-    haul: f.lay_place_mean,
-    dump: f.lay_finish_mean,
-    return: 0,
-  };
-
   let bottleneck = "Seimbang";
-  let bottleneck_reason = "Util tukang dan helper seimbang relatif terhadap buffer.";
-  if (loaderUtil > 0.85 && avgWait < 0.5) {
+  let bottleneck_reason = "Supply bata/mortar dan tukang relatif seimbang.";
+  if (loaderUtil > 0.85 && avgWait < 0.3) {
     bottleneck = "Tukang";
-    bottleneck_reason = "Tukang hampir jenuh — tambah tukang atau percepat siklus pasang.";
+    bottleneck_reason = "Tukang jenuh — tambah tukang atau percepat pasang.";
   } else if (haulerUtil > 0.85 && loaderUtil < 0.7) {
     bottleneck = "Helper";
-    bottleneck_reason = "Helper sibuk supply — tambah helper atau perbesar buffer scaffold/temp.";
-  } else if (avgWait > 1.5 || avgQ > 0.5) {
-    bottleneck = "Scaffold stock";
-    bottleneck_reason = "Tukang sering menunggu material di scaffold — perbanyak trip lift (helper) atau kapasitas scaffold.";
-  } else if (loaderUtil < 0.5 && haulerUtil < 0.5) {
-    bottleneck = "Under-utilized";
-    bottleneck_reason = "Armada longgar terhadap target — kurangi resource atau naikkan target volume.";
+    bottleneck_reason =
+      "Helper sibuk (fetch jauh / lift bata / mortar). Tambah helper atau perbesar slot scaffold.";
+  } else if (avgWait > 1 || avgQ > 0.4) {
+    bottleneck = "Scaffold stock / mortar";
+    bottleneck_reason =
+      "Tukang menunggu bata atau mortar di scaffold — isi slot (max 3×batch) atau ember mortar (3).";
   }
 
   return {
     operation: "bricklaying",
-    config: {
-      ...config,
-      num_loaders: nM,
-      num_haulers: nH,
-    },
+    config: { ...config, num_loaders: nM, num_haulers: nH },
     total_trips: totalTrips,
     total_volume: totalVolume,
     throughput_per_hour: throughput,
@@ -649,7 +695,13 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
     queue_over_time: queueOverTime,
     activity_log: activityLog,
     cycle_log: cycleLog,
-    avg_cycle_components,
+    avg_cycle_components: {
+      wait: avgWait,
+      load: f.lay_take_mean,
+      haul: f.lay_place_mean,
+      dump: f.lay_finish_mean,
+      return: 0,
+    },
     hauler_trips: Array(nH).fill(0),
     hauler_busy_per_unit: helperBusyInt.map((rows) =>
       rows.reduce((a, [x, y]) => a + Math.max(0, Math.min(y, horizon) - Math.max(x, 0)), 0),
@@ -663,23 +715,35 @@ export function runBrickTripleSimulation(configIn: SimulationConfig): Simulation
   };
 }
 
-/** Teoritis rough: min(helper supply chain, mason) */
 export function brickTheoreticalThroughput(cfg: SimulationConfig): {
   fetch: number;
   lift: number;
   lay: number;
+  mortar: number;
   system: number;
 } {
   const f = readBrickFields(cfg);
-  const fetchCycle =
-    f.fetch_travel_mean + f.fetch_load_mean + f.fetch_unload_mean + f.fetch_return_mean + f.fetch_travel_mean * 0.85;
-  const liftCycle =
+  const batch = f.batch_bricks;
+  const bpm2 = f.bricks_per_m2;
+  const farCyc =
+    f.far_travel_mean + f.far_load_mean + f.far_return_mean + f.far_unload_mean;
+  const liftCyc =
     f.lift_take_mean + f.lift_climb_mean + f.lift_unload_mean + f.lift_return_mean;
-  const layCycle = f.lay_take_mean + f.lay_place_mean + f.lay_finish_mean;
-  // helpers split time between A and B — approx half each if both needed
-  const fetch = fetchCycle > 0 ? (60 / fetchCycle) * f.num_helpers * 0.5 * f.fetch_payload_m2 : 0;
-  const lift = liftCycle > 0 ? (60 / liftCycle) * f.num_helpers * 0.5 * f.lift_payload_m2 : 0;
-  const lay = layCycle > 0 ? (60 / layCycle) * f.num_masons * f.lay_payload_m2 : 0;
-  const helperChain = Math.min(fetch, lift);
-  return { fetch, lift, lay, system: Math.min(helperChain, lay) };
+  const mortCyc =
+    f.mortar_take_mean + f.mortar_climb_mean + f.mortar_place_mean + f.mortar_return_mean;
+  const layCyc = f.lay_take_mean + f.lay_place_mean + f.lay_finish_mean;
+  // helpers split ~3 ways among fetch/lift/mortar when all needed
+  const share = f.num_helpers / 3;
+  const fetch = farCyc > 0 ? (60 / farCyc) * share * (batch / bpm2) : 0;
+  const lift = liftCyc > 0 ? (60 / liftCyc) * share * (batch / bpm2) : 0;
+  const mortar =
+    mortCyc > 0
+      ? (60 / mortCyc) * share * (f.mortar_covers_bricks / bpm2)
+      : 0;
+  const lay =
+    layCyc > 0
+      ? (60 / layCyc) * f.num_masons * (f.lay_bricks_per_cycle / bpm2)
+      : 0;
+  const system = Math.min(fetch, lift, mortar, lay);
+  return { fetch, lift, lay, mortar, system };
 }
