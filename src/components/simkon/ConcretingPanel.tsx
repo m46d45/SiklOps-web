@@ -644,15 +644,7 @@ export function ConcretingPanel() {
               <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,280px)]">
                 <Card>
                   <CardHeader className="pb-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base">{prof.label}</CardTitle>
-                      <Badge
-                        variant="outline"
-                        className={cn("capitalize", suitBadge(d.suitability))}
-                      >
-                        Cocok: {d.suitability}
-                      </Badge>
-                    </div>
+                    <CardTitle className="text-base">{prof.label}</CardTitle>
                     <CardDescription>{prof.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -876,7 +868,6 @@ export function ConcretingPanel() {
                       <thead>
                         <tr className="border-b border-border text-xs text-muted-foreground">
                           <th className="py-2 pr-3 font-medium">Metode</th>
-                          <th className="py-2 pr-3 font-medium">Cocok</th>
                           <th className="py-2 pr-3 font-medium">Cycle place</th>
                           <th className="py-2 pr-3 font-medium">Throughput</th>
                           <th className="py-2 pr-3 font-medium">Durasi</th>
@@ -890,16 +881,6 @@ export function ConcretingPanel() {
                         {compare.map((row) => (
                           <tr key={row.method} className="border-b border-border/60">
                             <td className="py-2 pr-3 font-medium">{row.label}</td>
-                            <td className="py-2 pr-3">
-                              <span
-                                className={cn(
-                                  "rounded px-1.5 py-0.5 text-xs capitalize",
-                                  suitBadge(row.suitability),
-                                )}
-                              >
-                                {row.suitability}
-                              </span>
-                            </td>
                             <td className="py-2 pr-3">{formatNum(row.cycle_place_mean, 1)} mnt</td>
                             <td className="py-2 pr-3">
                               {formatNum(row.result.throughput_per_hour, 1)} m³/jam
