@@ -293,7 +293,7 @@ export const OPERATIONS: OperationInfo[] = [
     },
     illustration: "/illustrations/tower-crane-multi-front.jpg",
     illustrationCaption:
-      "Single-server multi-front: yard → tower crane → Front A/B/C with priority queue (1 = highest).",
+      "MATERIAL YARD (kiri, terpisah) → Tower crane (single server) → Front A/B/C di bangunan (lokasi berbeda). Prioritas 1 = tertinggi.",
   },
 
 ];
