@@ -41,56 +41,46 @@ const DIST_KEYS = Object.keys(DIST_LABELS) as DistKind[];
 const DEFAULT_CV = 0.2;
 const DEFAULT_KIND: DistKind = "normal";
 
-type MeanKey = keyof BrickConfigFields;
-type DistFieldKey =
-  | "far_travel_dist"
-  | "far_load_dist"
-  | "far_return_dist"
-  | "far_unload_dist"
-  | "lift_take_dist"
-  | "lift_climb_dist"
-  | "lift_unload_dist"
-  | "lift_return_dist"
-  | "mortar_take_dist"
-  | "mortar_climb_dist"
-  | "mortar_place_dist"
-  | "mortar_return_dist"
-  | "lay_take_dist"
-  | "lay_place_dist"
-  | "lay_finish_dist";
+type DistKey = "fetch_dist" | "lift_dist" | "mortar_dist" | "lay_dist";
+type MeanKey = "fetch_mean" | "lift_mean" | "mortar_mean" | "lay_mean";
 
 type TaskDef = {
   label: string;
+  hint: string;
   meanKey: MeanKey;
-  distKey: DistFieldKey;
+  distKey: DistKey;
   maxMean: number;
 };
 
-const FETCH_TASKS: TaskDef[] = [
-  { label: "Travel ke pile jauh", meanKey: "far_travel_mean", distKey: "far_travel_dist", maxMean: 30 },
-  { label: "Load batch bata", meanKey: "far_load_mean", distKey: "far_load_dist", maxMean: 20 },
-  { label: "Return ke temp", meanKey: "far_return_mean", distKey: "far_return_dist", maxMean: 30 },
-  { label: "Unload ke temp", meanKey: "far_unload_mean", distKey: "far_unload_dist", maxMean: 20 },
-];
-
-const LIFT_TASKS: TaskDef[] = [
-  { label: "Ambil batch di temp", meanKey: "lift_take_mean", distKey: "lift_take_dist", maxMean: 15 },
-  { label: "Naik scaffold", meanKey: "lift_climb_mean", distKey: "lift_climb_dist", maxMean: 30 },
-  { label: "Unload slot scaffold", meanKey: "lift_unload_mean", distKey: "lift_unload_dist", maxMean: 15 },
-  { label: "Turun / return", meanKey: "lift_return_mean", distKey: "lift_return_dist", maxMean: 30 },
-];
-
-const MORTAR_TASKS: TaskDef[] = [
-  { label: "Ambil ember mortar", meanKey: "mortar_take_mean", distKey: "mortar_take_dist", maxMean: 15 },
-  { label: "Naik scaffold", meanKey: "mortar_climb_mean", distKey: "mortar_climb_dist", maxMean: 30 },
-  { label: "Taruh ember", meanKey: "mortar_place_mean", distKey: "mortar_place_dist", maxMean: 15 },
-  { label: "Return", meanKey: "mortar_return_mean", distKey: "mortar_return_dist", maxMean: 30 },
-];
-
-const LAY_TASKS: TaskDef[] = [
-  { label: "Ambil bata + mortar", meanKey: "lay_take_mean", distKey: "lay_take_dist", maxMean: 10 },
-  { label: "Pasang bata", meanKey: "lay_place_mean", distKey: "lay_place_dist", maxMean: 20 },
-  { label: "Finish / rapikan", meanKey: "lay_finish_mean", distKey: "lay_finish_dist", maxMean: 10 },
+const TASKS: TaskDef[] = [
+  {
+    label: "A · Helper fetch (pile jauh)",
+    hint: "Satu durasi full trip: ke pile jauh → bawa batch → temp stock",
+    meanKey: "fetch_mean",
+    distKey: "fetch_dist",
+    maxMean: 40,
+  },
+  {
+    label: "B · Helper lift bata ke scaffold",
+    hint: "Satu durasi full trip: ambil batch di temp → naik → taruh slot scaffold → turun",
+    meanKey: "lift_mean",
+    distKey: "lift_dist",
+    maxMean: 30,
+  },
+  {
+    label: "B′ · Helper supply mortar",
+    hint: "Satu durasi full trip: ambil ember (tim mortar ready) → scaffold → taruh → return",
+    meanKey: "mortar_mean",
+    distKey: "mortar_dist",
+    maxMean: 30,
+  },
+  {
+    label: "C · Tukang pasang bata",
+    hint: "Satu durasi per siklus pasang (butuh bata + mortar di scaffold)",
+    meanKey: "lay_mean",
+    distKey: "lay_dist",
+    maxMean: 20,
+  },
 ];
 
 function rebuildDist(base: DurationDist, kind: DistKind, cv: number): DurationDist {
@@ -110,27 +100,18 @@ function rebuildDist(base: DurationDist, kind: DistKind, cv: number): DurationDi
   return fromMeanCv(base.mean, cv, kind);
 }
 
-function ensureDist(
-  f: BrickConfigFields,
-  distKey: DistFieldKey,
-  mean: number,
-): DurationDist {
-  const existing = f[distKey] as DurationDist | null | undefined;
+function ensureDist(f: BrickConfigFields, distKey: DistKey, mean: number): DurationDist {
+  const existing = f[distKey];
   if (existing) return { ...existing, mean };
   return fromMeanCv(mean, DEFAULT_CV, DEFAULT_KIND);
 }
 
 function withDefaultDists(base: BrickConfigFields): BrickConfigFields {
-  const all = [...FETCH_TASKS, ...LIFT_TASKS, ...MORTAR_TASKS, ...LAY_TASKS];
   const next = { ...base };
-  for (const t of all) {
-    const mean = Number(next[t.meanKey]) || 0.1;
+  for (const t of TASKS) {
+    const mean = next[t.meanKey];
     if (!next[t.distKey]) {
-      (next as Record<string, unknown>)[t.distKey] = fromMeanCv(
-        mean,
-        DEFAULT_CV,
-        DEFAULT_KIND,
-      );
+      next[t.distKey] = fromMeanCv(mean, DEFAULT_CV, DEFAULT_KIND);
     }
   }
   return next;
@@ -175,134 +156,6 @@ function Field({
           onChange(v);
         }}
       />
-    </div>
-  );
-}
-
-function TaskBlock({
-  title,
-  subtitle,
-  tasks,
-  f,
-  onPatch,
-}: {
-  title: string;
-  subtitle: string;
-  tasks: TaskDef[];
-  f: BrickConfigFields;
-  onPatch: (p: Partial<BrickConfigFields>) => void;
-}) {
-  return (
-    <div className="space-y-3 rounded-[var(--radius-lg)] border border-border p-3 sm:p-4">
-      <div>
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-[11px] text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="space-y-4">
-        {tasks.map((task) => {
-          const mean = Number(f[task.meanKey]) || 0.1;
-          const dist = ensureDist(f, task.distKey, mean);
-          return (
-            <div
-              key={task.distKey}
-              className="grid gap-3 rounded-[var(--radius-md)] border border-border/70 bg-muted/10 p-3 sm:grid-cols-2 lg:grid-cols-4"
-            >
-              <div className="sm:col-span-2 lg:col-span-4">
-                <p className="text-xs font-medium text-foreground">{task.label}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Mean (menit)</Label>
-                <Input
-                  type="number"
-                  className="h-9 tabular-nums"
-                  min={0.05}
-                  max={task.maxMean}
-                  step={0.05}
-                  value={mean}
-                  onChange={(e) => {
-                    const m = Math.max(0.05, Number(e.target.value) || 0.05);
-                    const d = ensureDist(f, task.distKey, m);
-                    onPatch({
-                      [task.meanKey]: m,
-                      [task.distKey]: rebuildDist({ ...d, mean: m }, d.kind, d.cv),
-                    } as Partial<BrickConfigFields>);
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Distribusi</Label>
-                <Select
-                  value={dist.kind}
-                  onValueChange={(kind) => {
-                    const k = kind as DistKind;
-                    const cv = k === "constant" ? 0 : dist.cv > 0 ? dist.cv : DEFAULT_CV;
-                    onPatch({
-                      [task.distKey]: rebuildDist({ ...dist, mean, kind: k, cv }, k, cv),
-                    } as Partial<BrickConfigFields>);
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DIST_KEYS.map((k) => (
-                      <SelectItem key={k} value={k}>
-                        {DIST_LABELS[k]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {dist.kind !== "constant" && dist.kind !== "beta" ? (
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-muted-foreground">
-                    CV (std/mean) · {dist.cv.toFixed(2)}
-                  </Label>
-                  <Slider
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={[dist.cv]}
-                    onValueChange={([cv]) => {
-                      onPatch({
-                        [task.distKey]: rebuildDist({ ...dist, mean, cv }, dist.kind, cv),
-                      } as Partial<BrickConfigFields>);
-                    }}
-                  />
-                </div>
-              ) : null}
-              {dist.kind === "beta" ? (
-                <>
-                  <Field
-                    label="Min bound"
-                    value={dist.min_bound ?? mean * 0.5}
-                    min={0.05}
-                    max={(dist.max_bound ?? mean * 1.5) - 0.05}
-                    step={0.05}
-                    onChange={(v) =>
-                      onPatch({
-                        [task.distKey]: { ...dist, mean, kind: "beta", min_bound: v },
-                      } as Partial<BrickConfigFields>)
-                    }
-                  />
-                  <Field
-                    label="Max bound"
-                    value={dist.max_bound ?? mean * 1.5}
-                    min={(dist.min_bound ?? mean * 0.5) + 0.05}
-                    max={task.maxMean * 2}
-                    step={0.05}
-                    onChange={(v) =>
-                      onPatch({
-                        [task.distKey]: { ...dist, mean, kind: "beta", max_bound: v },
-                      } as Partial<BrickConfigFields>)
-                    }
-                  />
-                </>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -372,182 +225,160 @@ export function BricklayingPanel() {
     <div className="space-y-6">
       <Card className="border-primary/20">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Bricklaying · resource, tugas & distribusi</CardTitle>
+          <CardTitle className="text-base">Bricklaying · 4 tugas sederhana</CardTitle>
           <CardDescription className="leading-relaxed">
             Default: <strong className="text-foreground">1 helper</strong>,{" "}
             <strong className="text-foreground">2 tukang</strong>, scaffold{" "}
             <strong className="text-foreground">{f.scaffold_slots} slot bata</strong> +{" "}
             <strong className="text-foreground">{f.mortar_buckets_max} ember mortar</strong>.
-            Setiap tugas: mean (menit) + distribusi (seperti earthmoving).
+            Tiap tugas = <strong className="text-foreground">1 mean + distribusi</strong>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/20">
             <img
               src="/illustrations/bricklaying-cycle.jpg"
-              alt="Bricklaying batch + mortar"
+              alt="Bricklaying"
               className="mx-auto max-h-64 w-full object-contain object-center p-2 sm:max-h-80"
             />
-            <figcaption className="border-t border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
-              A Fetch jauh · B Lift bata / mortar · C Tukang lay. Slot & ember terbatas.
-            </figcaption>
           </figure>
 
           <div className="space-y-3 rounded-[var(--radius-lg)] border border-border bg-muted/15 p-3 sm:p-4">
             <p className="text-sm font-medium">Resources & kapasitas</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <Field
-                label="Helper"
-                value={f.num_helpers}
-                min={1}
-                max={20}
-                onChange={(v) => patch({ num_helpers: Math.floor(v) })}
-              />
-              <Field
-                label="Tukang"
-                value={f.num_masons}
-                min={1}
-                max={12}
-                onChange={(v) => patch({ num_masons: Math.floor(v) })}
-              />
-              <Field
-                label="Batch angkat helper"
-                unit="bata"
-                value={f.batch_bricks}
-                min={5}
-                max={50}
-                onChange={(v) => patch({ batch_bricks: Math.floor(v) })}
-              />
-              <Field
-                label="Space bata scaffold"
-                unit="slot"
-                value={f.scaffold_slots}
-                min={1}
-                max={8}
-                onChange={(v) => patch({ scaffold_slots: Math.floor(v) })}
-              />
-              <Field
-                label="Space ember mortar scaffold"
-                unit="ember"
-                value={f.mortar_buckets_max}
-                min={1}
-                max={10}
-                onChange={(v) => patch({ mortar_buckets_max: Math.floor(v) })}
-              />
-              <Field
-                label="Slot temp ground"
-                value={f.temp_slots}
-                min={1}
-                max={30}
-                onChange={(v) => patch({ temp_slots: Math.floor(v) })}
-              />
-              <Field
-                label="Threshold fetch jauh"
-                unit="bata sisa"
-                value={f.temp_refill_threshold}
-                min={0}
-                max={500}
-                onChange={(v) => patch({ temp_refill_threshold: Math.floor(v) })}
-              />
-              <Field
-                label="1 ember = "
-                unit="bata"
-                value={f.mortar_covers_bricks}
-                min={5}
-                max={100}
-                onChange={(v) => patch({ mortar_covers_bricks: Math.floor(v) })}
-              />
-              <Field
-                label="Bata per m²"
-                value={f.bricks_per_m2}
-                min={20}
-                max={120}
-                onChange={(v) => patch({ bricks_per_m2: Math.floor(v) })}
-              />
-              <Field
-                label="Bata / siklus tukang"
-                value={f.lay_bricks_per_cycle}
-                min={1}
-                max={10}
-                onChange={(v) => patch({ lay_bricks_per_cycle: Math.floor(v) })}
-              />
-              <Field
-                label="Upah tukang"
-                unit="ribu Rp/jam"
-                value={costMason / 1000}
-                min={0}
-                max={500}
-                step={5}
-                onChange={(v) => setCostMason(v * 1000)}
-              />
-              <Field
-                label="Upah helper"
-                unit="ribu Rp/jam"
-                value={costHelper / 1000}
-                min={0}
-                max={500}
-                step={5}
-                onChange={(v) => setCostHelper(v * 1000)}
-              />
+              <Field label="Helper" value={f.num_helpers} min={1} max={20} onChange={(v) => patch({ num_helpers: Math.floor(v) })} />
+              <Field label="Tukang" value={f.num_masons} min={1} max={12} onChange={(v) => patch({ num_masons: Math.floor(v) })} />
+              <Field label="Batch angkat" unit="bata" value={f.batch_bricks} min={5} max={50} onChange={(v) => patch({ batch_bricks: Math.floor(v) })} />
+              <Field label="Space bata scaffold" unit="slot" value={f.scaffold_slots} min={1} max={8} onChange={(v) => patch({ scaffold_slots: Math.floor(v) })} />
+              <Field label="Space ember mortar" unit="ember" value={f.mortar_buckets_max} min={1} max={10} onChange={(v) => patch({ mortar_buckets_max: Math.floor(v) })} />
+              <Field label="Slot temp ground" value={f.temp_slots} min={1} max={30} onChange={(v) => patch({ temp_slots: Math.floor(v) })} />
+              <Field label="Threshold fetch jauh" unit="bata sisa" value={f.temp_refill_threshold} min={0} max={500} onChange={(v) => patch({ temp_refill_threshold: Math.floor(v) })} />
+              <Field label="1 ember =" unit="bata" value={f.mortar_covers_bricks} min={5} max={100} onChange={(v) => patch({ mortar_covers_bricks: Math.floor(v) })} />
+              <Field label="Bata per m²" value={f.bricks_per_m2} min={20} max={120} onChange={(v) => patch({ bricks_per_m2: Math.floor(v) })} />
+              <Field label="Bata / siklus tukang" value={f.lay_bricks_per_cycle} min={1} max={10} onChange={(v) => patch({ lay_bricks_per_cycle: Math.floor(v) })} />
+              <Field label="Upah tukang" unit="ribu Rp/jam" value={costMason / 1000} min={0} max={200} step={1} onChange={(v) => setCostMason(v * 1000)} />
+              <Field label="Upah helper" unit="ribu Rp/jam" value={costHelper / 1000} min={0} max={200} step={1} onChange={(v) => setCostHelper(v * 1000)} />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Max temp {caps.tempMax} bata · Max scaffold {caps.scafMax} bata · Mortar scaffold ≈{" "}
-              {caps.mortarBricks} bata ekuivalen. Upah default (2026, mid-ID): tukang ≈ Rp 200 rb/hari · helper ≈ Rp 144 rb/hari (÷8 jam).
+              Max temp {caps.tempMax} · scaffold {caps.scafMax} bata · mortar ≈ {caps.mortarBricks} bata
+              ekuiv. Upah default mid-ID 2026: tukang 25 rb/jam · helper 18 rb/jam.
             </p>
           </div>
 
-          <TaskBlock
-            title="Tugas A · Helper fetch (pile jauh)"
-            subtitle="Trigger bila temp ≤ threshold. Mean + distribusi per fase."
-            tasks={FETCH_TASKS}
-            f={f}
-            onPatch={patch}
-          />
-          <TaskBlock
-            title="Tugas B · Helper lift bata ke scaffold"
-            subtitle="1 trip = 1 batch; hanya jika ada slot kosong di scaffold."
-            tasks={LIFT_TASKS}
-            f={f}
-            onPatch={patch}
-          />
-          <TaskBlock
-            title="Tugas B′ · Helper supply mortar"
-            subtitle="Tim mortar always-ready di ground. Scaffold max 3 ember."
-            tasks={MORTAR_TASKS}
-            f={f}
-            onPatch={patch}
-          />
-          <TaskBlock
-            title="Tugas C · Tukang pasang"
-            subtitle="Butuh bata + mortar di scaffold."
-            tasks={LAY_TASKS}
-            f={f}
-            onPatch={patch}
-          />
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Tugas (mean + distribusi)</p>
+            {TASKS.map((task) => {
+              const mean = f[task.meanKey];
+              const dist = ensureDist(f, task.distKey, mean);
+              return (
+                <div
+                  key={task.meanKey}
+                  className="space-y-3 rounded-[var(--radius-lg)] border border-border p-3 sm:p-4"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{task.label}</p>
+                    <p className="text-[11px] text-muted-foreground">{task.hint}</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Mean (menit)</Label>
+                      <Input
+                        type="number"
+                        className="h-9 tabular-nums"
+                        min={0.1}
+                        max={task.maxMean}
+                        step={0.1}
+                        value={mean}
+                        onChange={(e) => {
+                          const m = Math.max(0.1, Number(e.target.value) || 0.1);
+                          const d = ensureDist(f, task.distKey, m);
+                          patch({
+                            [task.meanKey]: m,
+                            [task.distKey]: rebuildDist({ ...d, mean: m }, d.kind, d.cv),
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Distribusi</Label>
+                      <Select
+                        value={dist.kind}
+                        onValueChange={(kind) => {
+                          const k = kind as DistKind;
+                          const cv = k === "constant" ? 0 : dist.cv > 0 ? dist.cv : DEFAULT_CV;
+                          patch({
+                            [task.distKey]: rebuildDist({ ...dist, mean, kind: k, cv }, k, cv),
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DIST_KEYS.map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {DIST_LABELS[k]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {dist.kind !== "constant" && dist.kind !== "beta" ? (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label className="text-xs text-muted-foreground">
+                          CV (std/mean) · {dist.cv.toFixed(2)}
+                        </Label>
+                        <Slider
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={[dist.cv]}
+                          onValueChange={([cv]) => {
+                            patch({
+                              [task.distKey]: rebuildDist({ ...dist, mean, cv }, dist.kind, cv),
+                            });
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                    {dist.kind === "beta" ? (
+                      <>
+                        <Field
+                          label="Min bound"
+                          value={dist.min_bound ?? mean * 0.5}
+                          min={0.05}
+                          max={(dist.max_bound ?? mean * 1.5) - 0.05}
+                          step={0.05}
+                          onChange={(v) =>
+                            patch({
+                              [task.distKey]: { ...dist, mean, kind: "beta", min_bound: v },
+                            })
+                          }
+                        />
+                        <Field
+                          label="Max bound"
+                          value={dist.max_bound ?? mean * 1.5}
+                          min={(dist.min_bound ?? mean * 0.5) + 0.05}
+                          max={task.maxMean * 2}
+                          step={0.05}
+                          onChange={(v) =>
+                            patch({
+                              [task.distKey]: { ...dist, mean, kind: "beta", max_bound: v },
+                            })
+                          }
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field
-              label="Target dinding"
-              unit="m²"
-              value={targetVolume}
-              min={1}
-              max={500}
-              onChange={setTargetVolume}
-            />
-            <Field
-              label="Target siklus tukang"
-              value={targetCycles}
-              min={1}
-              max={5000}
-              onChange={(v) => setTargetCycles(Math.floor(v))}
-            />
-            <Field
-              label="Seed"
-              value={seed}
-              min={1}
-              step={1}
-              onChange={(v) => setSeed(Math.floor(v))}
-            />
+            <Field label="Target dinding" unit="m²" value={targetVolume} min={1} max={500} onChange={setTargetVolume} />
+            <Field label="Target siklus tukang" value={targetCycles} min={1} max={5000} onChange={(v) => setTargetCycles(Math.floor(v))} />
+            <Field label="Seed" value={seed} min={1} step={1} onChange={(v) => setSeed(Math.floor(v))} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -571,16 +402,7 @@ export function BricklayingPanel() {
         </CardContent>
       </Card>
 
-      {result ? (
-        <ResultsPanel result={result} />
-      ) : (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Atur resource & tugas (mean + distribusi), lalu{" "}
-            <strong className="text-foreground">Jalankan simulasi</strong>.
-          </CardContent>
-        </Card>
-      )}
+      {result ? <ResultsPanel result={result} /> : null}
     </div>
   );
 }

@@ -134,12 +134,12 @@ export const OPERATIONS: OperationInfo[] = [
     description:
       "Batch bricklaying: helper fetch pile jauh → temp (slot×batch) → lift batch ke scaffold (3 slot max) + ember mortar (3) → tukang pasang. Mortar team always-ready.",
     tasks: [
-      { key: "load", label: "Helper fetch → temp" },
-      { key: "haul", label: "Helper lift → scaffold" },
-      { key: "dump", label: "Tukang pasang" },
-      { key: "return", label: "Buffer / space limit" },
+      { key: "load", label: "Helper fetch (jauh)" },
+      { key: "haul", label: "Helper lift bata" },
+      { key: "dump", label: "Helper supply mortar" },
+      { key: "return", label: "Tukang pasang" },
     ],
-    taskLabels: ["Fetch→temp", "Lift→scaffold", "Pasang", "Buffer limit"],
+    taskLabels: ["Fetch jauh", "Lift bata", "Supply mortar", "Pasang"],
     loaderLabel: "Tukang",
     haulerLabel: "Helper",
     loaderCapacityLabel: "Output pasang / siklus",
