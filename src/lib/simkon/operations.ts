@@ -150,7 +150,7 @@ export const OPERATIONS: OperationInfo[] = [
     available: true,
     defaults: {
       num_loaders: 2,
-      num_haulers: 3,
+      num_haulers: 1,
       loader_bucket: 0.25,
       hauler_capacity: 0.35,
       load: 2.8,

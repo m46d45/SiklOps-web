@@ -92,7 +92,7 @@ export type BrickConfigFields = {
 
 export function brickDefaults(): BrickConfigFields {
   return {
-    num_helpers: 3,
+    num_helpers: 1,
     num_masons: 2,
     batch_bricks: 20,
     scaffold_slots: 3,
