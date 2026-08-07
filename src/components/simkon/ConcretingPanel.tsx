@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play, RotateCcw } from "lucide-react";
 import {
   DEFAULT_SITE,
@@ -106,6 +106,79 @@ const TRUCK_PHASES: TruckPhase[] = [
   { key: "return", label: "Return to plant", meanKey: "truck_return_mean", distKey: "truck_return_dist", maxMean: 120 },
 ];
 
+type PlacePhaseKey = "fill" | "travel" | "place" | "return";
+
+type PlaceMeans = Record<PlacePhaseKey, number>;
+type PlaceDists = Record<PlacePhaseKey, DurationDist>;
+
+type PlacePhaseMeta = {
+  key: PlacePhaseKey;
+  label: string;
+  maxMean: number;
+};
+
+const PLACE_PHASE_META: PlacePhaseMeta[] = [
+  { key: "fill", label: "Fill from buffer", maxMean: 30 },
+  { key: "travel", label: "Travel", maxMean: 60 },
+  { key: "place", label: "Place", maxMean: 40 },
+  { key: "return", label: "Return empty", maxMean: 60 },
+];
+
+const PLACE_TASK_LABELS: Record<PlacementMethod, Record<PlacePhaseKey, string>> = {
+  dolly: {
+    fill: "Fill buggy",
+    travel: "Travel",
+    place: "Place",
+    return: "Return empty",
+  },
+  crane: {
+    fill: "Fill bucket",
+    travel: "Lift / swing",
+    place: "Place",
+    return: "Return bucket",
+  },
+  pump: {
+    fill: "Charge hopper",
+    travel: "Pump (line)",
+    place: "Place",
+    return: "Reset hose tip",
+  },
+};
+
+function meansFromDerived(d: {
+  fill_mean: number;
+  travel_mean: number;
+  place_mean: number;
+  return_mean: number;
+}): PlaceMeans {
+  return {
+    fill: d.fill_mean,
+    travel: d.travel_mean,
+    place: d.place_mean,
+    return: d.return_mean,
+  };
+}
+
+function distsFromMeans(means: PlaceMeans, cv = 0.2, kind: DistKind = "normal"): PlaceDists {
+  return {
+    fill: fromMeanCv(means.fill, cv, kind),
+    travel: fromMeanCv(means.travel, cv, kind),
+    place: fromMeanCv(means.place, cv, kind),
+    return: fromMeanCv(means.return, cv, kind),
+  };
+}
+
+function initPlaceState(distance_m: number, height_m: number, cv = 0.2, kind: DistKind = "normal") {
+  const means = {} as Record<PlacementMethod, PlaceMeans>;
+  const dists = {} as Record<PlacementMethod, PlaceDists>;
+  for (const m of PLACE_METHODS) {
+    const d = derivePlaceCycle(m, distance_m, height_m);
+    means[m] = meansFromDerived(d);
+    dists[m] = distsFromMeans(means[m], cv, kind);
+  }
+  return { means, dists };
+}
+
 function rebuildDist(base: DurationDist, kind: DistKind, cv: number): DurationDist {
   if (kind === "constant") return makeDist({ kind: "constant", mean: base.mean, cv: 0 });
   if (kind === "beta") {
@@ -142,6 +215,9 @@ export function ConcretingPanel() {
     crane: METHOD_PROFILES.crane.num_place,
     pump: METHOD_PROFILES.pump.num_place,
   });
+  const initP = initPlaceState(DEFAULT_SITE.distance_m, DEFAULT_SITE.height_m, DEFAULT_SITE.cv, DEFAULT_SITE.default_dist_kind);
+  const [placeMeans, setPlaceMeans] = useState(initP.means);
+  const [placeDists, setPlaceDists] = useState(initP.dists);
   const [results, setResults] = useState<
     Partial<Record<PlacementMethod, SimulationResult>>
   >({});
@@ -157,27 +233,79 @@ export function ConcretingPanel() {
     if (v === "dolly" || v === "crane" || v === "pump") setMethod(v);
   };
 
+
+  // Re-derive place cycle means when site geometry changes (keep dist kind/cv)
+  useEffect(() => {
+    setPlaceMeans((prev) => {
+      const next = { ...prev };
+      const nextDists: typeof placeDists = { ...placeDists };
+      for (const m of PLACE_METHODS) {
+        const d = derivePlaceCycle(m, site.distance_m, site.height_m);
+        const means = meansFromDerived(d);
+        next[m] = means;
+        const old = placeDists[m];
+        nextDists[m] = {
+          fill: rebuildDist({ ...old.fill, mean: means.fill }, old.fill.kind, old.fill.cv),
+          travel: rebuildDist({ ...old.travel, mean: means.travel }, old.travel.kind, old.travel.cv),
+          place: rebuildDist({ ...old.place, mean: means.place }, old.place.kind, old.place.cv),
+          return: rebuildDist({ ...old.return, mean: means.return }, old.return.kind, old.return.cv),
+        };
+      }
+      setPlaceDists(nextDists);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only geometry
+  }, [site.distance_m, site.height_m]);
+
+  const placeOverrides = (m: PlacementMethod) => ({
+    num_place: numPlace[m],
+    place_fill_mean: placeMeans[m].fill,
+    place_travel_mean: placeMeans[m].travel,
+    place_place_mean: placeMeans[m].place,
+    place_return_mean: placeMeans[m].return,
+    place_fill_dist: placeDists[m].fill,
+    place_travel_dist: placeDists[m].travel,
+    place_place_dist: placeDists[m].place,
+    place_return_dist: placeDists[m].return,
+  });
   const runCompare = () => {
     setRunning(true);
     requestAnimationFrame(() => {
       try {
-        const rows = compareAllMethods(site).map((row) => {
-          // honor per-method fleet overrides
-          if (numPlace[row.method] !== METHOD_PROFILES[row.method].num_place) {
-            const r = runSimulation(
-              buildConcretingConfig(site, row.method, {
-                num_place: numPlace[row.method],
-              }),
-            );
-            const hours = r.simulated_minutes / 60;
-            const vol = Math.max(r.total_volume, 1e-9);
-            const p = METHOD_PROFILES[row.method];
-            const totalCost =
-              hours * numPlace[row.method] * (p.cost_place_per_hour + p.cost_place_op) +
-              hours * site.num_trucks * (p.cost_truck_per_hour + p.cost_truck_op);
-            return { ...row, result: r, hours, unit_cost: totalCost / vol };
-          }
-          return row;
+        const rows: MethodCompareRow[] = PLACE_METHODS.map((method) => {
+          const r = runSimulation(buildConcretingConfig(site, method, placeOverrides(method)));
+          const d = derivePlaceCycle(method, site.distance_m, site.height_m);
+          const hours = r.simulated_minutes / 60;
+          const vol = Math.max(r.total_volume, 1e-9);
+          const p = METHOD_PROFILES[method];
+          const totalCost =
+            hours * numPlace[method] * (p.cost_place_per_hour + p.cost_place_op) +
+            hours * site.num_trucks * (p.cost_truck_per_hour + p.cost_truck_op);
+          const totalEmission =
+            hours * numPlace[method] *
+              (p.fuel_place_work * 0.5 + p.fuel_place_idle * 0.5) * 2.68 +
+            hours * site.num_trucks *
+              (p.fuel_truck_work * 0.5 + p.fuel_truck_idle * 0.5) * 2.68;
+          // Prefer result emissions if present
+          const unitEmission =
+            r.total_volume > 0 && "total_co2e_kg" in r && typeof (r as { total_co2e_kg?: number }).total_co2e_kg === "number"
+              ? ((r as { total_co2e_kg: number }).total_co2e_kg / vol)
+              : totalEmission / vol;
+          return {
+            method,
+            label: p.label,
+            suitability: d.suitability,
+            note: d.note,
+            cycle_place_mean:
+              placeMeans[method].fill +
+              placeMeans[method].travel +
+              placeMeans[method].place +
+              placeMeans[method].return,
+            result: r,
+            hours,
+            unit_cost: totalCost / vol,
+            unit_emission: unitEmission,
+          };
         });
         setCompare(rows);
         const next: Partial<Record<PlacementMethod, SimulationResult>> = {};
@@ -196,6 +324,14 @@ export function ConcretingPanel() {
       crane: METHOD_PROFILES.crane.num_place,
       pump: METHOD_PROFILES.pump.num_place,
     });
+    const p = initPlaceState(
+      DEFAULT_SITE.distance_m,
+      DEFAULT_SITE.height_m,
+      DEFAULT_SITE.cv,
+      DEFAULT_SITE.default_dist_kind,
+    );
+    setPlaceMeans(p.means);
+    setPlaceDists(p.dists);
     setResults({});
     setCompare(null);
   };
@@ -520,47 +656,150 @@ export function ConcretingPanel() {
                     <CardDescription>{prof.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Tasks · placing cycle
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {prof.tasks.map((task, i) => (
-                          <Badge key={task} variant="outline" className="font-normal">
-                            {i + 1}. {task}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
                     <p className="text-xs leading-relaxed text-muted-foreground">
-                      {d.note}
+                      {d.note} Mean place-cycle diturunkan dari jarak {site.distance_m} m · tinggi{" "}
+                      {site.height_m} m (bisa diubah). Setiap task punya distribusi sama pola Cycle A
+                      truck mixer.
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <Field
-                        label={`Jumlah ${prof.placeLabel.toLowerCase()}`}
-                        value={numPlace[m]}
-                        min={1}
-                        max={20}
-                        step={1}
-                        onChange={(v) =>
-                          setNumPlace((p) => ({ ...p, [m]: Math.floor(v) }))
-                        }
-                      />
-                      <div className="rounded-md border border-border bg-muted/40 p-3 text-xs sm:col-span-2">
-                        <p className="font-medium text-foreground">
-                          Cycle place (diturunkan dari jarak {site.distance_m} m · tinggi{" "}
-                          {site.height_m} m)
+                    <Field
+                      label={`Jumlah ${prof.placeLabel.toLowerCase()}`}
+                      value={numPlace[m]}
+                      min={1}
+                      max={20}
+                      step={1}
+                      onChange={(v) =>
+                        setNumPlace((p) => ({ ...p, [m]: Math.floor(v) }))
+                      }
+                    />
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium">Cycle B · placing tasks + distribution</p>
+                        <p className="text-xs text-muted-foreground">
+                          Fill · Travel · Place · Return — mean (menit) + distribusi + CV, sama seperti
+                          Cycle A (RMC truck mixer).
                         </p>
-                        <ul className="mt-2 grid grid-cols-2 gap-1 text-muted-foreground sm:grid-cols-5">
-                          <li>Fill: {d.fill_mean} mnt</li>
-                          <li>Travel: {d.travel_mean} mnt</li>
-                          <li>Place: {d.place_mean} mnt</li>
-                          <li>Return: {d.return_mean} mnt</li>
-                          <li className="font-medium text-foreground">
-                            Σ {d.cycle_mean} mnt
-                          </li>
-                        </ul>
                       </div>
+                      <div className="space-y-3">
+                        {PLACE_PHASE_META.map((ph) => {
+                          const mean = placeMeans[m][ph.key];
+                          const dist = placeDists[m][ph.key];
+                          const label = PLACE_TASK_LABELS[m][ph.key];
+                          return (
+                            <div
+                              key={ph.key}
+                              className="rounded-[var(--radius-lg)] border border-border bg-card/40 p-3 sm:p-4"
+                            >
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium">{label}</p>
+                                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                                  μ = {mean} mnt
+                                </span>
+                              </div>
+                              <div className="grid gap-3 sm:grid-cols-[1fr_minmax(140px,180px)] sm:items-end">
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs text-muted-foreground">Mean (menit)</Label>
+                                  <Slider
+                                    min={0.5}
+                                    max={ph.maxMean}
+                                    step={0.5}
+                                    value={[mean]}
+                                    onValueChange={([v]) => {
+                                      const nd = rebuildDist(
+                                        { ...dist, mean: v },
+                                        dist.kind,
+                                        dist.cv,
+                                      );
+                                      setPlaceMeans((pm) => ({
+                                        ...pm,
+                                        [m]: { ...pm[m], [ph.key]: v },
+                                      }));
+                                      setPlaceDists((pd) => ({
+                                        ...pd,
+                                        [m]: { ...pd[m], [ph.key]: nd },
+                                      }));
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-xs text-muted-foreground">Distribusi</Label>
+                                  <Select
+                                    value={dist.kind}
+                                    onValueChange={(v) => {
+                                      const kind = v as DistKind;
+                                      const cv =
+                                        kind === "constant"
+                                          ? 0
+                                          : dist.cv > 0
+                                            ? dist.cv
+                                            : site.cv;
+                                      setPlaceDists((pd) => ({
+                                        ...pd,
+                                        [m]: {
+                                          ...pd[m],
+                                          [ph.key]: rebuildDist(
+                                            { ...dist, mean },
+                                            kind,
+                                            cv,
+                                          ),
+                                        },
+                                      }));
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {DIST_KEYS.map((k) => (
+                                        <SelectItem key={k} value={k}>
+                                          {DIST_LABELS[k]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              {dist.kind !== "constant" && dist.kind !== "beta" ? (
+                                <div className="mt-3 space-y-1.5">
+                                  <Label className="text-xs text-muted-foreground">
+                                    CV (std/mean) = {dist.cv.toFixed(2)}
+                                  </Label>
+                                  <Slider
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                    value={[dist.cv]}
+                                    onValueChange={([v]) =>
+                                      setPlaceDists((pd) => ({
+                                        ...pd,
+                                        [m]: {
+                                          ...pd[m],
+                                          [ph.key]: rebuildDist(
+                                            { ...dist, mean },
+                                            dist.kind,
+                                            v,
+                                          ),
+                                        },
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Σ place cycle ≈{" "}
+                        <strong className="text-foreground">
+                          {(
+                            placeMeans[m].fill +
+                            placeMeans[m].travel +
+                            placeMeans[m].place +
+                            placeMeans[m].return
+                          ).toFixed(1)}{" "}
+                          mnt
+                        </strong>
+                      </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -571,9 +810,7 @@ export function ConcretingPanel() {
                           requestAnimationFrame(() => {
                             try {
                               const r = runSimulation(
-                                buildConcretingConfig(site, m, {
-                                  num_place: numPlace[m],
-                                }),
+                                buildConcretingConfig(site, m, placeOverrides(m)),
                               );
                               setResults((prev) => ({ ...prev, [m]: r }));
                             } finally {
@@ -592,9 +829,14 @@ export function ConcretingPanel() {
                 <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-muted/30">
                   <img
                     src={prof.illustration}
-                    alt={prof.label}
-                    className="mx-auto max-h-48 w-full object-contain object-center p-2 sm:max-h-56"
+                    alt={`Dual-cycle schematic: RMC truck mixer → site buffer → ${prof.label}`}
+                    className="mx-auto max-h-56 w-full object-contain object-center p-2 sm:max-h-72"
                   />
+                  <figcaption className="border-t border-border px-2 py-2 text-[10px] leading-relaxed text-muted-foreground sm:text-xs">
+                    <strong className="text-foreground">Cycle A</strong> truck mixer plant↔site →
+                    buffer · <strong className="text-foreground">Cycle B</strong> {prof.shortLabel}{" "}
+                    place · who waits whom at buffer
+                  </figcaption>
                 </figure>
               </div>
 

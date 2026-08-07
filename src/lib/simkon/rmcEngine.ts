@@ -208,10 +208,22 @@ export function applyRmcToConfig(
     haul_time_mean: merged.place_travel_mean,
     dump_time_mean: merged.place_place_mean,
     return_time_mean: merged.place_return_mean,
-    load_dist: fromMeanCv(merged.place_fill_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    haul_dist: fromMeanCv(merged.place_travel_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    dump_dist: fromMeanCv(merged.place_place_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
-    return_dist: fromMeanCv(merged.place_return_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
+    load_dist:
+      base.place_fill_dist ??
+      fromMeanCv(merged.place_fill_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
+    haul_dist:
+      base.place_travel_dist ??
+      fromMeanCv(merged.place_travel_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
+    dump_dist:
+      base.place_place_dist ??
+      fromMeanCv(merged.place_place_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
+    return_dist:
+      base.place_return_dist ??
+      fromMeanCv(merged.place_return_mean, base.cv ?? 0.2, base.default_dist_kind ?? "normal"),
+    place_fill_dist: base.place_fill_dist ?? null,
+    place_travel_dist: base.place_travel_dist ?? null,
+    place_place_dist: base.place_place_dist ?? null,
+    place_return_dist: base.place_return_dist ?? null,
     cost_loader_per_hour: base.cost_loader_per_hour || d.cost_place,
     cost_hauler_per_hour: base.cost_hauler_per_hour || d.cost_truck,
     cost_loader_operator_per_hour: base.cost_loader_operator_per_hour ?? d.cost_place_op,
@@ -260,6 +272,21 @@ function sampleTruck(
     haul: config.truck_haul_dist,
     discharge: config.truck_discharge_dist,
     return: config.truck_return_dist,
+  } as const;
+  return sample(rng, config, mean, map[phase] ?? null);
+}
+
+function samplePlace(
+  rng: Rng,
+  config: SimulationConfig,
+  phase: "fill" | "travel" | "place" | "return",
+  mean: number,
+): number {
+  const map = {
+    fill: config.place_fill_dist,
+    travel: config.place_travel_dist,
+    place: config.place_place_dist,
+    return: config.place_return_dist,
   } as const;
   return sample(rng, config, mean, map[phase] ?? null);
 }
@@ -390,7 +417,7 @@ export function runRmcDualSimulation(configIn: SimulationConfig): SimulationResu
       buffer -= vol;
       // maybe free a waiting truck
       tryDischarge(now);
-      const fill = sample(rng, config, f.place_fill_mean);
+      const fill = samplePlace(rng, config, "fill", f.place_fill_mean);
       placeBusy[unit.id].push([now, now + fill]);
       recAct(unit.id + 1000, "load", now, fill);
       push({ t: now + fill, kind: "place_fill_done", id: unit.id, vol });
@@ -443,12 +470,12 @@ export function runRmcDualSimulation(configIn: SimulationConfig): SimulationResu
       recAct(ev.id, "load", now, bt);
       push({ t: now + bt, kind: "truck_batch_done", id: ev.id });
     } else if (ev.kind === "place_fill_done") {
-      const tr = sample(rng, config, f.place_travel_mean);
+      const tr = samplePlace(rng, config, "travel", f.place_travel_mean);
       placeBusy[ev.id].push([now, now + tr]);
       recAct(ev.id + 1000, "haul", now, tr);
       push({ t: now + tr, kind: "place_travel_done", id: ev.id, vol: ev.vol });
     } else if (ev.kind === "place_travel_done") {
-      const pl = sample(rng, config, f.place_place_mean);
+      const pl = samplePlace(rng, config, "place", f.place_place_mean);
       placeBusy[ev.id].push([now, now + pl]);
       recAct(ev.id + 1000, "dump", now, pl);
       push({ t: now + pl, kind: "place_place_done", id: ev.id, vol: ev.vol });
@@ -456,7 +483,7 @@ export function runRmcDualSimulation(configIn: SimulationConfig): SimulationResu
       totalTrips += 1;
       totalVolume += ev.vol;
       timelineVolume.push([now, totalVolume]);
-      const ret = sample(rng, config, f.place_return_mean);
+      const ret = samplePlace(rng, config, "return", f.place_return_mean);
       // approximate cycle components for log
       const ct =
         f.place_fill_mean + f.place_travel_mean + f.place_place_mean + f.place_return_mean;

@@ -228,6 +228,10 @@ export type SimulationConfig = {
   truck_haul_dist?: DurationDist | null;
   truck_discharge_dist?: DurationDist | null;
   truck_return_dist?: DurationDist | null;
+  place_fill_dist?: DurationDist | null;
+  place_travel_dist?: DurationDist | null;
+  place_place_dist?: DurationDist | null;
+  place_return_dist?: DurationDist | null;
 };
 
 

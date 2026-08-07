@@ -338,10 +338,10 @@ export function buildConcretingConfig(
       truck_haul_mean: site.truck_haul_mean,
       truck_discharge_mean: site.truck_discharge_mean,
       truck_return_mean: site.truck_return_mean,
-      place_fill_mean: derived.fill_mean,
-      place_travel_mean: derived.travel_mean,
-      place_place_mean: derived.place_mean,
-      place_return_mean: derived.return_mean,
+      place_fill_mean: overrides?.place_fill_mean ?? derived.fill_mean,
+      place_travel_mean: overrides?.place_travel_mean ?? derived.travel_mean,
+      place_place_mean: overrides?.place_place_mean ?? derived.place_mean,
+      place_return_mean: overrides?.place_return_mean ?? derived.return_mean,
     },
   );
 }
