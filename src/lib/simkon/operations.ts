@@ -182,7 +182,7 @@ export const OPERATIONS: OperationInfo[] = [
     },
     illustration: "/illustrations/bricklaying-cycle.jpg",
     illustrationCaption:
-      "Triple-cycle: A Helper fetch → temp stock (limited) · B Helper lift → scaffold stock (limited space) · C Tukang lay.",
+      "Triple-cycle: A Helper fetch bata+mortar → temp/mortar stock (limited) · B Helper lift ke scaffold · C Tukang lay.",
   },
   {
     id: "concreting",

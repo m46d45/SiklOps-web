@@ -141,10 +141,9 @@ export function BricklayingPanel() {
               className="mx-auto max-h-64 w-full object-contain object-center p-2 sm:max-h-80"
             />
             <figcaption className="border-t border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">
-              <strong className="text-foreground">A Fetch</strong> pile→temp ·{" "}
-              <strong className="text-foreground">B Lift</strong> temp→scaffold ·{" "}
-              <strong className="text-foreground">C Lay</strong> tukang pasang. Temp &
-              scaffold kapasitas terbatas.
+              <strong className="text-foreground">A Fetch</strong> bata + mortar → stock terbatas ·{" "}
+              <strong className="text-foreground">B Lift</strong> naik scaffold ·{" "}
+              <strong className="text-foreground">C Lay</strong> tukang pasang. Mortar box & scaffold stock terbatas.
             </figcaption>
           </figure>
           <div className="grid gap-2 sm:grid-cols-3">
