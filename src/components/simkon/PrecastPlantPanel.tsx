@@ -35,6 +35,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatNum } from "@/lib/utils";
+import { trackSimulation } from "@/lib/simkon/usageClient";
 
 const DIST_KEYS = Object.keys(DIST_LABELS) as DistKind[];
 const DEFAULT_CV = 0.15;
@@ -137,6 +138,8 @@ export function PrecastPlantPanel() {
           fields,
         );
         setResult(runSimulation(cfg));
+        trackSimulation("precast_plant");
+
         requestAnimationFrame(() => {
           document.getElementById("hasil-precast")?.scrollIntoView({ behavior: "smooth", block: "start" });
         });

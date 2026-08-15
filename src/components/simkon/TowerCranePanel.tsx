@@ -38,6 +38,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatNum } from "@/lib/utils";
+import { trackSimulation } from "@/lib/simkon/usageClient";
 
 const DIST_KEYS = Object.keys(DIST_LABELS) as DistKind[];
 
@@ -242,6 +243,7 @@ export function TowerCranePanel() {
           fields,
         );
         setResult(runTowerCraneSimulation(cfg));
+        trackSimulation("tower_crane");
       } finally {
         setRunning(false);
       }

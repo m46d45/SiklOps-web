@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { CreatedWithGrokBanner } from "@/components/created-with-grok-banner";
+import { UsageTracker } from "@/components/simkon/UsageTracker";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "SiklOps";
@@ -53,6 +54,7 @@ function RootShell() {
       <body className="min-h-dvh bg-background text-foreground antialiased">
         <CreatedWithGrokBanner />
         <AuthProvider>
+          <UsageTracker />
           <Outlet />
         </AuthProvider>
         <Scripts />

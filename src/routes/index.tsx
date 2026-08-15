@@ -25,6 +25,7 @@ import {
   type SavedScenario,
 } from "@/lib/simkon/scenarios";
 import { downloadCsv, resultToCsv } from "@/lib/simkon/exportResults";
+import { trackSimulation } from "@/lib/simkon/usageClient";
 import { OperationSidebar } from "@/components/simkon/OperationSidebar";
 import { ParameterPanel } from "@/components/simkon/ParameterPanel";
 import { ResultsPanel } from "@/components/simkon/ResultsPanel";
@@ -80,6 +81,7 @@ function SiklOpsApp() {
       try {
         const r = runSimulation({ ...draft, operation: operationId });
         setResult(r);
+        trackSimulation(operationId);
         requestAnimationFrame(() => {
           document
             .getElementById("hasil-simulasi")
@@ -152,6 +154,9 @@ function SiklOpsApp() {
             <Button type="button" variant="outline" size="sm" onClick={onExport} disabled={!result}>
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">CSV</span>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/statistik">Statistik</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/manual">Manual</Link>

@@ -36,6 +36,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatNum } from "@/lib/utils";
+import { trackSimulation } from "@/lib/simkon/usageClient";
 
 const DIST_KEYS = Object.keys(DIST_LABELS) as DistKind[];
 const DEFAULT_CV = 0.2;
@@ -205,6 +206,7 @@ export function BricklayingPanel() {
           f,
         );
         setResult(runSimulation(cfg));
+        trackSimulation("bricklaying");
       } finally {
         setRunning(false);
       }

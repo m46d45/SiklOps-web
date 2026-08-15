@@ -51,6 +51,7 @@ import {
   YAxis,
 } from "recharts";
 import { cn, formatNum } from "@/lib/utils";
+import { trackSimulation } from "@/lib/simkon/usageClient";
 
 function Field({
   label,
@@ -333,6 +334,7 @@ export function ConcretingPanel() {
         const next: Partial<Record<PlacementMethod, SimulationResult>> = {};
         for (const row of rows) next[row.method] = row.result;
         setResults(next);
+        trackSimulation("concreting");
       } finally {
         setRunning(false);
       }
@@ -1020,6 +1022,7 @@ export function ConcretingPanel() {
                                 buildConcretingConfig(site, m, placeOverrides(m)),
                               );
                               setResults((prev) => ({ ...prev, [m]: r }));
+                              trackSimulation("concreting");
                             } finally {
                               setRunning(false);
                             }

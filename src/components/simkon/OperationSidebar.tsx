@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BookOpen,
   BrickWall,
   Cylinder,
@@ -14,6 +15,7 @@ import {
   type OperationInfo,
 } from "@/lib/simkon/operations";
 import { cn } from "@/lib/utils";
+import { useUsageSnapshot } from "@/components/simkon/UsageTracker";
 
 /** Simple tower-crane silhouette (lucide has no dedicated crane) */
 function TowerCraneIcon({
@@ -79,6 +81,7 @@ export function OperationSidebar({
   onNavigate,
   className,
 }: Props) {
+  const { stats, ready } = useUsageSnapshot();
   return (
     <nav
       className={cn("flex h-full min-h-0 flex-col", className)}
@@ -104,7 +107,28 @@ export function OperationSidebar({
         </ul>
       </div>
 
-      <div className="mt-6 shrink-0 border-t border-border pt-4">
+      <div className="mt-6 shrink-0 space-y-2 border-t border-border pt-4">
+        <Link
+          to="/statistik"
+          onClick={() => onNavigate?.()}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-transparent px-3 py-3 text-left",
+            "text-foreground transition-[background-color,border-color] duration-[var(--motion-quick)]",
+            "hover:border-border hover:bg-muted",
+          )}
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-muted text-muted-foreground">
+            <BarChart3 className="h-4 w-4" strokeWidth={1.75} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium leading-snug">Statistik</span>
+            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+              {ready
+                ? `${stats.uniqueVisitors} pengunjung · ${stats.totalSimulations} simulasi`
+                : "Pengunjung & run"}
+            </span>
+          </span>
+        </Link>
         <Link
           to="/manual"
           onClick={() => onNavigate?.()}
