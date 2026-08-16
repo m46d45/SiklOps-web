@@ -284,7 +284,9 @@ function SiklOpsApp() {
               ) : null}
               {operation.id !== "concreting" &&
               operation.id !== "bricklaying" &&
-              operation.id !== "tower_crane" ? (
+              operation.id !== "tower_crane" &&
+              operation.id !== "asphalt_paving" &&
+              operation.id !== "precast_plant" ? (
                 <div>
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     Tugas (task)
@@ -308,6 +310,10 @@ function SiklOpsApp() {
                         ? "Helper (fetch+lift) · Tukang · Temp & scaffold buffer"
                         : operation.id === "tower_crane"
                           ? "Tower crane · 1–5 work fronts · priority queue"
+                          : operation.id === "asphalt_paving"
+                            ? "Plant · Dump truck · Paver · Breakdown & finish roller"
+                            : operation.id === "precast_plant"
+                              ? "Form · Crew · Crane · Cure slots"
                           : `${operation.loaderLabel} · ${operation.haulerLabel}`
                   }
                 />
@@ -316,7 +322,9 @@ function SiklOpsApp() {
                   label={
                     operation.id === "concreting" ||
                     operation.id === "bricklaying" ||
-                    operation.id === "tower_crane"
+                    operation.id === "tower_crane" ||
+                    operation.id === "asphalt_paving" ||
+                    operation.id === "precast_plant"
                       ? "Model"
                       : "Durasi"
                   }
@@ -327,6 +335,10 @@ function SiklOpsApp() {
                         ? "Triple-cycle · helper A/B + tukang"
                         : operation.id === "tower_crane"
                           ? "Single-server · multi-front priority"
+                          : operation.id === "asphalt_paving"
+                            ? "Paving train · plant–truck–paver–roller"
+                            : operation.id === "precast_plant"
+                              ? "Form cycle · crane + cure buffer"
                           : operation.durationUnit
                   }
                 />

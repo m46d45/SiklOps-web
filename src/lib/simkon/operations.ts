@@ -361,7 +361,7 @@ export const OPERATIONS: OperationInfo[] = [
     },
     illustration: "/illustrations/asphalt-paving-cycle.jpg",
     illustrationCaption:
-      "Plant → truck haul → paver hopper → spread → breakdown → finish. Linear paving train.",
+      "Plant (kiri, terpisah) → haul → dump ke hopper paver → spread → breakdown roller → finish roller.",
   },
   {
     id: "precast_plant",
@@ -419,7 +419,7 @@ export const OPERATIONS: OperationInfo[] = [
     },
     illustration: "/illustrations/precast-plant-cycle.jpg",
     illustrationCaption:
-      "Form beds → pour with overhead crane → curing slots → strip → stock. Limited cure positions.",
+      "FORM → POUR+CRANE → CURE SLOTS (terbatas) → STRIP → CLEAN → STOCK. Form cycle pabrik precast.",
   },
 
 ];

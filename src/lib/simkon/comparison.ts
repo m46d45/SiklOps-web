@@ -16,6 +16,8 @@ import {
 import { computeCosts } from "./costs";
 import { computeEmissions } from "./emissions";
 import { isRmcOperation, placementMethodOf } from "./rmcEngine";
+import { isAsphaltOperation, readAsphaltFields } from "./asphaltEngine";
+import { isPrecastOperation, readPrecastFields } from "./precastEngine";
 
 export const COMPARE_LOADERS = [1, 2, 3] as const;
 export const COMPARE_HAULERS_MAX = 40;
@@ -129,6 +131,53 @@ export function theoreticalThroughput(
     };
   }
 
+  if (isAsphaltOperation(base.operation)) {
+    const f = readAsphaltFields({
+      ...base,
+      num_loaders: numLoaders,
+      num_haulers: numHaulers,
+    });
+    const payload = f.truck_capacity_m3;
+    const truckCycle = Math.max(
+      0.1,
+      f.plant_load_mean + f.haul_mean + f.dump_mean + f.return_mean,
+    );
+    const hauler = (numHaulers * 60) / truckCycle * payload;
+    const paver = (numLoaders * 60) / Math.max(0.1, f.spread_mean) * payload;
+    const plant = (f.plant_bays * 60) / Math.max(0.1, f.plant_load_mean) * payload;
+    return {
+      system: Math.min(hauler, paver, plant),
+      loader: paver,
+      hauler,
+      cycleMin: truckCycle,
+    };
+  }
+
+  if (isPrecastOperation(base.operation)) {
+    const f = readPrecastFields({
+      ...base,
+      num_loaders: numLoaders,
+      num_haulers: numHaulers,
+    });
+    const vol = f.element_volume_m3;
+    const formCycle = Math.max(
+      1,
+      f.prepare_mean + f.pour_mean + f.cure_mean + f.strip_mean + f.clean_mean,
+    );
+    const crewWork = Math.max(1, f.prepare_mean + f.pour_mean + f.strip_mean + f.clean_mean);
+    const craneWork = Math.max(1, f.pour_mean + f.strip_mean);
+    const formThr = (numHaulers * 60) / formCycle * vol;
+    const crewThr = (numLoaders * 60) / crewWork * vol;
+    const craneThr = (f.num_cranes * 60) / craneWork * vol;
+    const cureThr = (f.num_cure_slots * 60) / Math.max(1, f.cure_mean) * vol;
+    return {
+      system: Math.min(formThr, crewThr, craneThr, cureThr),
+      loader: crewThr,
+      hauler: formThr,
+      cycleMin: formCycle,
+    };
+  }
+
   const payload = Math.max(0.01, base.hauler_capacity_m3 ?? base.payload_per_trip ?? 1);
   const loadMean = expectedMean(
     resolveDist(base, base.load_dist, base.load_time_mean),
@@ -189,6 +238,8 @@ function cellFromResult(
  */
 /** Deret place-unit / loader untuk grid perbandingan per operasi */
 export function compareLoaderSeries(base: SimulationConfig): number[] {
+  if (isAsphaltOperation(base.operation)) return [1, 2, 3];
+  if (isPrecastOperation(base.operation)) return [1, 2, 3];
   if (!isRmcOperation(base.operation)) return [...COMPARE_LOADERS];
   const method = placementMethodOf(
     base.operation,
@@ -205,7 +256,11 @@ export function runComparisonGrid(base: SimulationConfig): ComparisonGrid {
   const loaders = compareLoaderSeries(base);
   const haulersMax = isRmcOperation(base.operation)
     ? COMPARE_HAULERS_MAX_RMC
-    : COMPARE_HAULERS_MAX;
+    : isAsphaltOperation(base.operation)
+      ? 20
+      : isPrecastOperation(base.operation)
+        ? 12
+        : COMPARE_HAULERS_MAX;
   const cells: ComparisonCell[] = [];
   const loaderCeilings: Record<number, number> = {};
   const rmc = isRmcOperation(base.operation);
@@ -225,6 +280,9 @@ export function runComparisonGrid(base: SimulationConfig): ComparisonGrid {
         // RMC dual-cycle membaca num_place / num_trucks — wajib di-sync
         num_place: nL,
         num_trucks: nH,
+        num_pavers: nL,
+        num_forms: nH,
+        num_crews: nL,
         cv,
         seed: seedBase + nL * 100 + nH,
         load_dist: fromMeanCv(base.load_time_mean, cv, kind),

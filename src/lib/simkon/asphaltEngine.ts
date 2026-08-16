@@ -94,8 +94,8 @@ export function readAsphaltFields(cfg: SimulationConfig): AsphaltFields {
   const d = asphaltDefaults();
   const c = cfg as SimulationConfig & Partial<AsphaltFields>;
   return {
-    num_trucks: Math.max(1, Math.floor(c.num_trucks ?? cfg.num_haulers ?? d.num_trucks)),
-    num_pavers: Math.max(1, Math.floor(c.num_pavers ?? cfg.num_loaders ?? d.num_pavers)),
+    num_trucks: Math.max(1, Math.floor(cfg.num_haulers ?? c.num_trucks ?? d.num_trucks)),
+    num_pavers: Math.max(1, Math.floor(cfg.num_loaders ?? c.num_pavers ?? d.num_pavers)),
     num_breakdown: Math.max(0, Math.floor(c.num_breakdown ?? d.num_breakdown)),
     num_finish: Math.max(0, Math.floor(c.num_finish ?? d.num_finish)),
     plant_bays: Math.max(1, Math.floor(c.plant_bays ?? d.plant_bays)),
@@ -226,6 +226,7 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
   let plantBusy = 0;
   // hopper: loads available for spread
   let hopper = 0;
+  let dumpBusy = 0;
   // trucks waiting to dump (need hopper space)
   const dumpQ: number[] = [];
   // paver
@@ -332,10 +333,11 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
   };
 
   const tryStartDump = (t: number) => {
-    while (dumpQ.length && hopper < hopperCap) {
-      // need a free "dump slot" — modeled as instantaneous capacity if hopper space
+    // Satu dump per paver; hopper+in-flight dump tidak boleh melebihi kapasitas
+    while (dumpQ.length && dumpBusy < nPavers && hopper + dumpBusy < hopperCap) {
       const id = dumpQ.shift()!;
       truckPh[id] = "dumping";
+      dumpBusy += 1;
       setTruckBusy(id, t, true);
       const dur = sample(rng, config, f.dump_mean, f.dump_dist);
       activityLog.push({ hauler_id: id, phase: "dump", start: t, end: t + dur, duration: dur });
@@ -435,6 +437,7 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
       }
       case "dump_done": {
         const id = ev.id;
+        dumpBusy = Math.max(0, dumpBusy - 1);
         hopper = Math.min(hopperCap, hopper + 1);
         totalTrips++;
         // truck returns

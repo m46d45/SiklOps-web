@@ -253,6 +253,9 @@ export type SimulationConfig = {
   place_capacity_m3?: number;
   num_trucks?: number;
   num_place?: number;
+  num_pavers?: number;
+  num_forms?: number;
+  num_crews?: number;
   placement_method?: "dolly" | "crane" | "pump";
   place_distance_m?: number;
   place_height_m?: number;

@@ -69,8 +69,8 @@ export function readPrecastFields(cfg: SimulationConfig): PrecastFields {
   const d = precastDefaults();
   const c = cfg as SimulationConfig & Partial<PrecastFields>;
   return {
-    num_forms: Math.max(1, Math.floor(c.num_forms ?? cfg.num_haulers ?? d.num_forms)),
-    num_crews: Math.max(1, Math.floor(c.num_crews ?? cfg.num_loaders ?? d.num_crews)),
+    num_forms: Math.max(1, Math.floor(cfg.num_haulers ?? c.num_forms ?? d.num_forms)),
+    num_crews: Math.max(1, Math.floor(cfg.num_loaders ?? c.num_crews ?? d.num_crews)),
     num_cure_slots: Math.max(1, Math.floor(c.num_cure_slots ?? d.num_cure_slots)),
     num_cranes: Math.max(1, Math.floor(c.num_cranes ?? d.num_cranes)),
     element_volume_m3: Math.max(0.1, c.element_volume_m3 ?? cfg.payload_per_trip ?? d.element_volume_m3),
@@ -379,7 +379,6 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
         setCrew(t, Math.max(0, crewBusy - 1));
         formState[id] = "wait_pour";
         formStart[id] = t;
-        setFormBusy(id, t, false);
         qPour.push(id);
         logQ(t);
         tryDispatch(t);
@@ -390,7 +389,6 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
         setCrane(t, Math.max(0, craneBusy - 1));
         formState[id] = "wait_cure";
         formStart[id] = t;
-        setFormBusy(id, t, false);
         qCure.push(id);
         logQ(t);
         tryDispatch(t);
@@ -400,7 +398,6 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
         setCure(t, Math.max(0, cureBusy - 1));
         formState[id] = "wait_strip";
         formStart[id] = t;
-        setFormBusy(id, t, false);
         qStrip.push(id);
         logQ(t);
         tryDispatch(t);
@@ -430,7 +427,6 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
         });
         formState[id] = "idle";
         formStart[id] = t;
-        setFormBusy(id, t, false);
         qClean.push(id);
         logQ(t);
         tryDispatch(t);
