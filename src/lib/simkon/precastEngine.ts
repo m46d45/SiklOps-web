@@ -194,6 +194,14 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
 
   const formState: FormState[] = Array(nForms).fill("idle");
   const formStart: number[] = Array(nForms).fill(0);
+  const formCycleStart: number[] = Array(nForms).fill(0);
+  const formPhase = Array.from({ length: nForms }, () => ({
+    prepare: 0,
+    pour: 0,
+    cure: 0,
+    strip: 0,
+    wait: 0,
+  }));
 
   // queues of form ids waiting for resource
   const qPrepare: number[] = [];
@@ -279,12 +287,14 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
     while (qStrip.length && freeCrews > 0 && freeCrane > 0) {
       const id = qStrip.shift()!;
       formState[id] = "strip";
+      formPhase[id].wait += Math.max(0, t - formStart[id]);
       setCrew(t, crewBusy + 1);
       setCrane(t, craneBusy + 1);
       setFormBusy(id, t, true);
       const w = Math.max(0, t - formStart[id]);
       waitSamples.push(w);
       const dur = sample(rng, config, f.strip_mean, f.strip_dist);
+      formPhase[id].strip = dur;
       serviceTimes.push(dur);
       activityLog.push({ hauler_id: id, phase: "return", start: t, end: t + dur, duration: dur });
       push(t + dur, "strip_done", id);
@@ -294,6 +304,7 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
     while (qPour.length && freeCrews > 0 && freeCrane > 0) {
       const id = qPour.shift()!;
       formState[id] = "pour";
+      formPhase[id].wait += Math.max(0, t - formStart[id]);
       setCrew(t, crewBusy + 1);
       setCrane(t, craneBusy + 1);
       setFormBusy(id, t, true);
@@ -301,6 +312,7 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
       waitSamples.push(w);
       arrivalTimes.push(t);
       const dur = sample(rng, config, f.pour_mean, f.pour_dist);
+      formPhase[id].pour = dur;
       serviceTimes.push(dur);
       activityLog.push({ hauler_id: id, phase: "haul", start: t, end: t + dur, duration: dur });
       push(t + dur, "pour_done", id);
@@ -324,6 +336,7 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
       setCrew(t, crewBusy + 1);
       setFormBusy(id, t, true);
       const dur = sample(rng, config, f.prepare_mean, f.prepare_dist);
+      formPhase[id].prepare = dur;
       activityLog.push({ hauler_id: id, phase: "load", start: t, end: t + dur, duration: dur });
       push(t + dur, "prepare_done", id);
       logQ(t);
@@ -332,9 +345,11 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
     while (qCure.length && freeCure > 0) {
       const id = qCure.shift()!;
       formState[id] = "cure";
+      formPhase[id].wait += Math.max(0, t - formStart[id]);
       setCure(t, cureBusy + 1);
       setFormBusy(id, t, true);
       const dur = sample(rng, config, f.cure_mean, f.cure_dist);
+      formPhase[id].cure = dur;
       activityLog.push({ hauler_id: id, phase: "dump", start: t, end: t + dur, duration: dur });
       push(t + dur, "cure_done", id);
       logQ(t);
@@ -410,23 +425,31 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
         totalTrips++;
         totalVolume += vol;
         timelineVolume.push([t, totalVolume]);
+        const wait = formPhase[id].wait;
+        const load = formPhase[id].prepare;
+        const haul = formPhase[id].pour;
+        const dump = formPhase[id].cure;
+        const ret = formPhase[id].strip + f.clean_mean;
+        const cycle = Math.max(0.05, t - formCycleStart[id] + f.clean_mean);
+        const productive = load + haul + formPhase[id].strip + f.clean_mean;
         cycleLog.push({
           hauler_id: id,
           trip: totalTrips,
-          wait: 0,
-          load: f.prepare_mean,
-          haul: f.pour_mean,
-          dump: f.cure_mean,
-          return: f.strip_mean + f.clean_mean,
-          cycle_time: f.prepare_mean + f.pour_mean + f.cure_mean + f.strip_mean + f.clean_mean,
-          productive_time: f.prepare_mean + f.pour_mean + f.strip_mean + f.clean_mean,
+          wait,
+          load,
+          haul,
+          dump,
+          return: ret,
+          cycle_time: cycle,
+          productive_time: productive,
           finish_time: t,
           return_finish: t,
           volume: vol,
-          productivity: 0,
+          productivity: (vol / cycle) * 60,
         });
         formState[id] = "idle";
         formStart[id] = t;
+        formPhase[id] = { prepare: 0, pour: 0, cure: 0, strip: 0, wait: 0 };
         qClean.push(id);
         logQ(t);
         tryDispatch(t);
@@ -436,6 +459,7 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
         setCrew(t, Math.max(0, crewBusy - 1));
         formState[id] = "idle";
         formStart[id] = t;
+        formCycleStart[id] = t;
         setFormBusy(id, t, false);
         qPrepare.push(id);
         logQ(t);
@@ -514,11 +538,21 @@ export function runPrecastSimulation(configIn: SimulationConfig): SimulationResu
     activity_log: activityLog.slice(0, 2000),
     cycle_log: cycleLog,
     avg_cycle_components: {
-      wait: avgWait,
-      load: f.prepare_mean,
-      haul: f.pour_mean,
-      dump: f.cure_mean,
-      return: f.strip_mean + f.clean_mean,
+      wait: cycleLog.length
+        ? cycleLog.reduce((s, c) => s + c.wait, 0) / cycleLog.length
+        : avgWait,
+      load: cycleLog.length
+        ? cycleLog.reduce((s, c) => s + c.load, 0) / cycleLog.length
+        : f.prepare_mean,
+      haul: cycleLog.length
+        ? cycleLog.reduce((s, c) => s + c.haul, 0) / cycleLog.length
+        : f.pour_mean,
+      dump: cycleLog.length
+        ? cycleLog.reduce((s, c) => s + c.dump, 0) / cycleLog.length
+        : f.cure_mean,
+      return: cycleLog.length
+        ? cycleLog.reduce((s, c) => s + c.return, 0) / cycleLog.length
+        : f.strip_mean + f.clean_mean,
     },
     hauler_trips: Array(nForms)
       .fill(0)

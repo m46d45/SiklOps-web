@@ -110,12 +110,30 @@ const TASKS: { label: string; hint: string; meanKey: MeanKey; distKey: DistKey }
   { label: "D · Finish roller", hint: "Finish compact setelah breakdown", meanKey: "finish_mean", distKey: "finish_dist" },
 ];
 
+function runAsphalt(fields: AsphaltFields, seed: number, targetCycles: number, targetVolume: number) {
+  const base = defaultConfig("asphalt_paving");
+  return runSimulation(
+    applyAsphaltToConfig(
+      {
+        ...base,
+        seed,
+        target_cycles: targetCycles,
+        target_volume: targetVolume,
+        stop_mode: "either",
+      },
+      fields,
+    ),
+  );
+}
+
 export function AsphaltPavingPanel() {
   const [fields, setFields] = useState<AsphaltFields>(() => asphaltDefaults());
   const [seed, setSeed] = useState(12345);
   const [targetCycles, setTargetCycles] = useState(80);
   const [targetVolume, setTargetVolume] = useState(400);
-  const [result, setResult] = useState<SimulationResult | null>(null);
+  const [result, setResult] = useState<SimulationResult | null>(() =>
+    runAsphalt(asphaltDefaults(), 12345, 80, 400),
+  );
   const [running, setRunning] = useState(false);
 
   const thr = useMemo(() => asphaltTheoreticalThroughput(fields), [fields]);
@@ -144,18 +162,7 @@ export function AsphaltPavingPanel() {
     setRunning(true);
     requestAnimationFrame(() => {
       try {
-        const base = defaultConfig("asphalt_paving");
-        const cfg = applyAsphaltToConfig(
-          {
-            ...base,
-            seed,
-            target_cycles: targetCycles,
-            target_volume: targetVolume,
-            stop_mode: "either",
-          },
-          fields,
-        );
-        setResult(runSimulation(cfg));
+        setResult(runAsphalt(fields, seed, targetCycles, targetVolume));
         trackSimulation("asphalt_paving");
         requestAnimationFrame(() => {
           document.getElementById("hasil-asphalt")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -171,7 +178,8 @@ export function AsphaltPavingPanel() {
     setSeed(12345);
     setTargetCycles(80);
     setTargetVolume(400);
-    setResult(null);
+    setResult(runAsphalt(asphaltDefaults(), 12345, 80, 400));
+
   };
 
   return (

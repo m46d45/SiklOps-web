@@ -94,12 +94,31 @@ const TASKS: { label: string; hint: string; meanKey: MeanKey; distKey: DistKey; 
   { label: "5 · Clean form", hint: "Crew membersihkan form untuk siklus berikutnya", meanKey: "clean_mean", distKey: "clean_dist", max: 60 },
 ];
 
+function runPrecast(fields: PrecastFields, seed: number, targetCycles: number, targetVolume: number) {
+  const base = defaultConfig("precast_plant");
+  return runSimulation(
+    applyPrecastToConfig(
+      {
+        ...base,
+        seed,
+        target_cycles: targetCycles,
+        target_volume: targetVolume,
+        stop_mode: "either",
+        simulation_duration: 14 * 24 * 60,
+      },
+      fields,
+    ),
+  );
+}
+
 export function PrecastPlantPanel() {
   const [fields, setFields] = useState<PrecastFields>(() => precastDefaults());
   const [seed, setSeed] = useState(12345);
   const [targetCycles, setTargetCycles] = useState(20);
   const [targetVolume, setTargetVolume] = useState(50);
-  const [result, setResult] = useState<SimulationResult | null>(null);
+  const [result, setResult] = useState<SimulationResult | null>(() =>
+    runPrecast(precastDefaults(), 12345, 20, 50),
+  );
   const [running, setRunning] = useState(false);
 
   const thr = useMemo(() => precastTheoreticalThroughput(fields), [fields]);
@@ -124,20 +143,7 @@ export function PrecastPlantPanel() {
     setRunning(true);
     requestAnimationFrame(() => {
       try {
-        const base = defaultConfig("precast_plant");
-        // long horizon for cure; stop on cycles/volume first
-        const cfg = applyPrecastToConfig(
-          {
-            ...base,
-            seed,
-            target_cycles: targetCycles,
-            target_volume: targetVolume,
-            stop_mode: "either",
-            simulation_duration: 14 * 24 * 60,
-          },
-          fields,
-        );
-        setResult(runSimulation(cfg));
+        setResult(runPrecast(fields, seed, targetCycles, targetVolume));
         trackSimulation("precast_plant");
 
         requestAnimationFrame(() => {
@@ -154,7 +160,8 @@ export function PrecastPlantPanel() {
     setSeed(12345);
     setTargetCycles(20);
     setTargetVolume(50);
-    setResult(null);
+    setResult(runPrecast(precastDefaults(), 12345, 20, 50));
+
   };
 
   return (

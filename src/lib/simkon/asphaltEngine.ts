@@ -241,6 +241,14 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
   type TruckPh = "to_plant" | "loading" | "hauling" | "wait_dump" | "dumping" | "returning";
   const truckPh: TruckPh[] = Array(nTrucks).fill("to_plant");
   const truckWaitStart: number[] = Array(nTrucks).fill(0);
+  const truckCyc = Array.from({ length: nTrucks }, () => ({
+    wait: 0,
+    load: 0,
+    haul: 0,
+    waitDump: 0,
+    dump: 0,
+    ret: 0,
+  }));
 
   let plantBusyMin = 0;
   let plantBusySince = -1;
@@ -321,9 +329,11 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
       truckPh[id] = "loading";
       setTruckBusy(id, t, true);
       const w = Math.max(0, t - truckWaitStart[id]);
+      truckCyc[id].wait = w;
       waitSamples.push(w);
       arrivalTimes.push(t);
       const dur = sample(rng, config, f.plant_load_mean, f.plant_load_dist);
+      truckCyc[id].load = dur;
       serviceTimes.push(dur);
       activityLog.push({ hauler_id: id, phase: "load", start: t, end: t + dur, duration: dur });
       push(t + dur, "plant_done", id);
@@ -339,7 +349,9 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
       truckPh[id] = "dumping";
       dumpBusy += 1;
       setTruckBusy(id, t, true);
+      truckCyc[id].waitDump = Math.max(0, t - truckWaitStart[id]);
       const dur = sample(rng, config, f.dump_mean, f.dump_dist);
+      truckCyc[id].dump = dur;
       activityLog.push({ hauler_id: id, phase: "dump", start: t, end: t + dur, duration: dur });
       push(t + dur, "dump_done", id);
       logQ(t);
@@ -420,6 +432,7 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
         const id = ev.id;
         truckPh[id] = "hauling";
         const dur = sample(rng, config, f.haul_mean, f.haul_dist);
+        truckCyc[id].haul = dur;
         activityLog.push({ hauler_id: id, phase: "haul", start: t, end: t + dur, duration: dur });
         push(t + dur, "haul_done", id);
         tryStartPlant(t);
@@ -443,23 +456,27 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
         // truck returns
         truckPh[id] = "returning";
         const ret = sample(rng, config, f.return_mean, f.return_dist);
+        truckCyc[id].ret = ret;
         activityLog.push({ hauler_id: id, phase: "return", start: t, end: t + ret, duration: ret });
         push(t + ret, "return_done", id);
-        // cycle log (approx)
+        const wait = truckCyc[id].wait + truckCyc[id].waitDump;
+        const productive =
+          truckCyc[id].load + truckCyc[id].haul + truckCyc[id].dump + truckCyc[id].ret;
+        const cycle = wait + productive;
         cycleLog.push({
           hauler_id: id,
           trip: totalTrips,
-          wait: 0,
-          load: f.plant_load_mean,
-          haul: f.haul_mean,
-          dump: f.dump_mean,
-          return: f.return_mean,
-          cycle_time: f.plant_load_mean + f.haul_mean + f.dump_mean + f.return_mean,
-          productive_time: f.plant_load_mean + f.haul_mean + f.dump_mean + f.return_mean,
+          wait,
+          load: truckCyc[id].load,
+          haul: truckCyc[id].haul,
+          dump: truckCyc[id].dump,
+          return: truckCyc[id].ret,
+          cycle_time: cycle,
+          productive_time: productive,
           finish_time: t,
           return_finish: t + ret,
           volume: payload,
-          productivity: 0,
+          productivity: (payload / Math.max(cycle, 0.05)) * 60,
         });
         tryStartSpread(t);
         tryStartDump(t);
@@ -542,6 +559,18 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
   const avgWait = waitSamples.length
     ? waitSamples.reduce((a, b) => a + b, 0) / waitSamples.length
     : 0;
+  const avgFromLog = (key: "load" | "haul" | "dump" | "return" | "wait") =>
+    cycleLog.length
+      ? cycleLog.reduce((s, c) => s + c[key], 0) / cycleLog.length
+      : key === "wait"
+        ? avgWait
+        : key === "load"
+          ? f.plant_load_mean
+          : key === "haul"
+            ? f.haul_mean
+            : key === "dump"
+              ? f.dump_mean
+              : f.return_mean;
   const avgQ = qIntegral / Math.max(horizon, 1e-9);
   const thr = (totalVolume / Math.max(horizon, 1e-9)) * 60;
 
@@ -601,11 +630,11 @@ export function runAsphaltSimulation(configIn: SimulationConfig): SimulationResu
     activity_log: activityLog.slice(0, 2000),
     cycle_log: cycleLog,
     avg_cycle_components: {
-      wait: avgWait,
-      load: f.plant_load_mean,
-      haul: f.haul_mean,
-      dump: f.dump_mean,
-      return: f.return_mean,
+      wait: avgFromLog("wait"),
+      load: avgFromLog("load"),
+      haul: avgFromLog("haul"),
+      dump: avgFromLog("dump"),
+      return: avgFromLog("return"),
     },
     hauler_trips: Array(nTrucks).fill(0).map((_, i) =>
       cycleLog.filter((c) => c.hauler_id === i).length,
